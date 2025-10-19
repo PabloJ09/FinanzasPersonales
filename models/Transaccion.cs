@@ -5,7 +5,7 @@ namespace FinanzasPersonales.Models
 {
     public class Transaccion
     {
-        //Esta es una prueba
+        //Esta es una prueba 2
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = string.Empty;

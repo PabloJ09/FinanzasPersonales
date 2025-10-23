@@ -26,6 +26,6 @@ Thumbs.db
 *.tmp
 *.bak
 
-# Dependencias del proyecto (si existieran)
+# Dependencias del proyecto
 node_modules/
 

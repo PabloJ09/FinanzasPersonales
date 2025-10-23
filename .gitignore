@@ -1,23 +1,31 @@
-# Build results
+# Archivos y carpetas de compilación
 bin/
 obj/
 
-# Visual Studio
+# Configuración del IDE
 .vscode/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
 
-# Environment variables
+# Archivos de entorno y configuración sensible
 .env
+appsettings.json
+appsettings.*.json
+
+# Archivos del sistema
+*.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 
-# Packages
-*.nupkg
-*.snupkg
+# Archivos temporales
+~$*
+*.tmp
+*.bak
 
-# Others
-*.DS_Store
+# Dependencias del proyecto (si existieran)
+node_modules/
+

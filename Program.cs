@@ -26,10 +26,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-app.MapGet("/testmongo", (MongoDBContext db) =>
-{
-    return $"Conexión MongoDB establecida con DB: {db.Transacciones.Database.DatabaseNamespace.DatabaseName}";
-});
+
 
 // Habilitar Swagger solo en desarrollo
 if (app.Environment.IsDevelopment())

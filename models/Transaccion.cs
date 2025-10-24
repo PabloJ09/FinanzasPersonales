@@ -1,28 +1,25 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using System;
 
 namespace FinanzasPersonales.Models
 {
     public class Transaccion
     {
-        //Esta es una prueba 2
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; } = string.Empty;
+        public string? Id { get; set; }
 
-        [BsonElement("tipo")]
-        public string Tipo { get; set; } = string.Empty; // "Ingreso" o "Gasto"
+        public string Tipo { get; set; } = null!; // "Ingreso" o "Gasto"
 
-        [BsonElement("monto")]
         public decimal Monto { get; set; }
 
-        [BsonElement("categoria")]
-        public string Categoria { get; set; } = string.Empty;
+        public string Descripcion { get; set; } = null!;
 
-        [BsonElement("descripcion")]
-        public string Descripcion { get; set; } = string.Empty;
+        public string CategoriaId { get; set; } = null!;
 
-        [BsonElement("fecha")]
         public DateTime Fecha { get; set; } = DateTime.UtcNow;
+
+        public string UsuarioId { get; set; } = null!;
     }
 }

@@ -1,45 +1,65 @@
 using FinanzasPersonales.Database;
+using FinanzasPersonales.Services;
 using DotNetEnv;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 
-Env.Load(); // Cargar variables desde .env
+Env.Load(); // 🔒 Cargar variables desde .env
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar MongoDBSettings usando las variables de entorno
+// ============================
+// CONFIGURACIÓN DE SERVICIOS
+// ============================
+
+// MongoDBSettings
 var mongoSettings = new MongoDBSettings
 {
     ConnectionString = Environment.GetEnvironmentVariable("MONGO_URI")!,
     DatabaseName = Environment.GetEnvironmentVariable("MONGO_DB")!
 };
 
-// Registrar MongoDBContext como singleton
+// Registrar MongoDB y servicios
 builder.Services.AddSingleton(mongoSettings);
 builder.Services.AddSingleton<MongoDBContext>();
 
-// Configuración de Swagger
+builder.Services.AddScoped<UsuarioService>();
+builder.Services.AddScoped<CategoriaService>();
+builder.Services.AddScoped<TransaccionService>();
+
+// Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// ============================
+// PIPELINE
+// ============================
 
-
-// Habilitar Swagger solo en desarrollo
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+app.UseHttpsRedirection();
 
-// Endpoint base
-app.MapGet("/", () => "🚀 API de Finanzas Personales funcionando!");
+// ============================
+// ENDPOINTS DE PRUEBA
+// ============================
 
-// Endpoint de prueba (weatherforecast)
+app.MapGet("/", () => "API de Finanzas Personales funcionando!");
+
+// Test MongoDB
+app.MapGet("/testmongo", (MongoDBContext db) =>
+{
+    return $"Conexión MongoDB establecida con DB: {db.DatabaseName}";
+});
+
+// WeatherForecast de ejemplo
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
@@ -61,9 +81,10 @@ app.MapGet("/weatherforecast", () =>
 
 app.Run();
 
-// Record de prueba
+// ============================
+// RECORD DE PRUEBA
+// ============================
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
-

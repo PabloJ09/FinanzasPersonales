@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 
-Env.Load(); // 🔒 Cargar variables desde .env
+Env.Load(); // Cargar variables desde .env
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,9 +25,11 @@ var mongoSettings = new MongoDBSettings
 builder.Services.AddSingleton(mongoSettings);
 builder.Services.AddSingleton<MongoDBContext>();
 
-builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<CategoriaService>();
 builder.Services.AddScoped<TransaccionService>();
+
+// Registrar controladores para habilitar los endpoints REST
+builder.Services.AddControllers();
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -46,6 +48,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Agregar controladores al pipeline 
+app.MapControllers();
 
 // ============================
 // ENDPOINTS DE PRUEBA

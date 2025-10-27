@@ -15,12 +15,47 @@ public class CategoriasController : ControllerBase
         _service = service;
     }
 
+    // GET: api/categorias
     [HttpGet]
-    public async Task<List<Categoria>> Get() => await _service.GetAsync();
+    public async Task<ActionResult<List<Categoria>>> Get()
+        => Ok(await _service.GetAsync());
 
+    // GET: api/categorias/{id}
+    [HttpGet("{id}")]
+    public async Task<ActionResult<Categoria>> GetById(string id)
+    {
+        var categoria = await _service.GetByIdAsync(id);
+        if (categoria == null) return NotFound("Categoría no encontrada");
+        return Ok(categoria);
+    }
+
+    // POST: api/categorias
     [HttpPost]
-    public async Task<Categoria> Create([FromBody] Categoria categoria) => await _service.CreateAsync(categoria);
+    public async Task<ActionResult<Categoria>> Create([FromBody] Categoria categoria)
+    {
+        await _service.CreateAsync(categoria);
+        return CreatedAtAction(nameof(GetById), new { id = categoria.Id }, categoria);
+    }
 
+    // PUT: api/categorias/{id}
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(string id, [FromBody] Categoria categoria)
+    {
+        var existente = await _service.GetByIdAsync(id);
+        if (existente == null) return NotFound("Categoría no encontrada");
+
+        await _service.UpdateAsync(id, categoria);
+        return NoContent();
+    }
+
+    // DELETE: api/categorias/{id}
     [HttpDelete("{id}")]
-    public async Task Delete(string id) => await _service.DeleteAsync(id);
+    public async Task<IActionResult> Delete(string id)
+    {
+        var existente = await _service.GetByIdAsync(id);
+        if (existente == null) return NotFound("Categoría no encontrada");
+
+        await _service.DeleteAsync(id);
+        return NoContent();
+    }
 }

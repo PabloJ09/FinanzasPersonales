@@ -8,7 +8,7 @@ namespace FinanzasPersonales.Services
     {
         private readonly IMongoCollection<Transaccion> _transacciones;
 
-        public TransaccionService(MongoDBContext context)
+        public TransaccionService(IMongoDBContext context)
         {
             _transacciones = context.Transacciones;
         }

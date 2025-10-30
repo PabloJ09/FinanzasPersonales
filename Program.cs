@@ -6,6 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 
+// ============================
+// CARGA DE VARIABLES DE ENTORNO
+// ============================
 Env.Load(); // Cargar variables desde .env
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,31 +17,38 @@ var builder = WebApplication.CreateBuilder(args);
 // CONFIGURACIÓN DE SERVICIOS
 // ============================
 
-// MongoDBSettings
+// 🔹 Crear objeto MongoDBSettings a partir de las variables de entorno
 var mongoSettings = new MongoDBSettings
 {
     ConnectionString = Environment.GetEnvironmentVariable("MONGO_URI")!,
     DatabaseName = Environment.GetEnvironmentVariable("MONGO_DB")!
 };
 
-// Registrar MongoDB y servicios
+// 🔹 Registrar MongoDBSettings para inyección
 builder.Services.AddSingleton(mongoSettings);
-builder.Services.AddSingleton<MongoDBContext>();
 
+// 🔹 Registrar el contexto de base de datos mediante la interfaz
+builder.Services.AddSingleton<IMongoDBContext>(sp =>
+{
+    var settings = sp.GetRequiredService<MongoDBSettings>();
+    return new MongoDBContext(settings);
+});
+
+// 🔹 Registrar servicios de dominio
 builder.Services.AddScoped<CategoriaService>();
 builder.Services.AddScoped<TransaccionService>();
 
-// Registrar controladores para habilitar los endpoints REST
+// 🔹 Registrar controladores REST
 builder.Services.AddControllers();
 
-// Swagger / OpenAPI
+// 🔹 Agregar Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
 // ============================
-// PIPELINE
+// CONFIGURACIÓN DEL PIPELINE
 // ============================
 
 if (app.Environment.IsDevelopment())
@@ -48,23 +58,22 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// Agregar controladores al pipeline 
 app.MapControllers();
 
 // ============================
 // ENDPOINTS DE PRUEBA
 // ============================
 
-app.MapGet("/", () => "API de Finanzas Personales funcionando!");
+// Endpoint raíz (para verificar despliegue rápido)
+app.MapGet("/", () => "✅ API de Finanzas Personales funcionando correctamente!");
 
-// Test MongoDB
-app.MapGet("/testmongo", (MongoDBContext db) =>
+// Endpoint para probar conexión MongoDB
+app.MapGet("/testmongo", (IMongoDBContext db) =>
 {
-    return $"Conexión MongoDB establecida con DB: {db.DatabaseName}";
+    return $"Conexión MongoDB establecida con la base de datos: {db.DatabaseName}";
 });
 
-// WeatherForecast de ejemplo
+// Endpoint ejemplo de prueba (WeatherForecast)
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
@@ -80,6 +89,7 @@ app.MapGet("/weatherforecast", () =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
+
     return forecast;
 })
 .WithName("GetWeatherForecast");
@@ -87,7 +97,7 @@ app.MapGet("/weatherforecast", () =>
 app.Run();
 
 // ============================
-// RECORD DE PRUEBA
+// RECORD DE PRUEBA (solo demo)
 // ============================
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {

@@ -3,7 +3,7 @@ using FinanzasPersonales.Models;
 
 namespace FinanzasPersonales.Database
 {
-    public class MongoDBContext
+    public class MongoDBContext : IMongoDBContext
     {
         private readonly IMongoDatabase _database;
 
@@ -13,11 +13,11 @@ namespace FinanzasPersonales.Database
             _database = client.GetDatabase(settings.DatabaseName);
         }
 
-        // 🔹 Propiedad pública para obtener el nombre de la base de datos
+        // Mantén pública la propiedad DatabaseName
         public string DatabaseName => _database.DatabaseNamespace.DatabaseName;
 
+        // Implementación de la interfaz
         public IMongoCollection<Transaccion> Transacciones => _database.GetCollection<Transaccion>("Transacciones");
         public IMongoCollection<Categoria> Categorias => _database.GetCollection<Categoria>("Categorias");
     }
 }
-

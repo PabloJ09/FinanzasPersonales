@@ -8,7 +8,7 @@ namespace FinanzasPersonales.Services
     {
         private readonly IMongoCollection<Categoria> _categorias;
 
-        public CategoriaService(MongoDBContext context)
+        public CategoriaService(IMongoDBContext context)
         {
             _categorias = context.Categorias;
         }
@@ -24,13 +24,38 @@ namespace FinanzasPersonales.Services
         // Crear nueva categoría
         public async Task<Categoria> CreateAsync(Categoria categoria)
         {
+            // Eliminamos el id si viene definido para que MongoDB lo genere automáticamente
+            categoria.Id = null;
             await _categorias.InsertOneAsync(categoria);
             return categoria;
         }
 
-        // Actualizar categoría existente
-        public async Task UpdateAsync(string id, Categoria categoria) =>
+        // Actualizar completamente (PUT)
+        public async Task UpdateAsync(string id, Categoria categoria)
+        {
+            categoria.Id = id; // Aseguramos que el id del objeto sea el de la ruta
             await _categorias.ReplaceOneAsync(c => c.Id == id, categoria);
+        }
+
+        // Actualizar parcialmente (PATCH)
+        public async Task<Categoria?> UpdatePartialAsync(string id, Categoria partial)
+        {
+            var existing = await _categorias.Find(c => c.Id == id).FirstOrDefaultAsync();
+            if (existing == null) return null;
+
+            // Solo actualizamos los campos que tengan valor
+            if (!string.IsNullOrEmpty(partial.Nombre))
+                existing.Nombre = partial.Nombre;
+
+            if (!string.IsNullOrEmpty(partial.Tipo))
+                existing.Tipo = partial.Tipo;
+
+            if (!string.IsNullOrEmpty(partial.UsuarioId))
+                existing.UsuarioId = partial.UsuarioId;
+
+            await _categorias.ReplaceOneAsync(c => c.Id == id, existing);
+            return existing;
+        }
 
         // Eliminar categoría
         public async Task DeleteAsync(string id) =>

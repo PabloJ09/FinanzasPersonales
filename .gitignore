@@ -1,9 +1,11 @@
 # Archivos y carpetas de compilación
 bin/
 obj/
+TestResults/
 
 # Configuración del IDE
 .vscode/
+.vs/
 *.user
 *.suo
 *.userosscache
@@ -29,3 +31,7 @@ Thumbs.db
 # Dependencias del proyecto
 node_modules/
 
+# Cobertura de código
+*.coverage
+*.coveragexml
+coverage.cobertura.xml

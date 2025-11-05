@@ -1,6 +1,7 @@
 using FinanzasPersonales.Database;
 using FinanzasPersonales.Models;
 using MongoDB.Driver;
+using System.ComponentModel.DataAnnotations;
 
 namespace FinanzasPersonales.Services
 {
@@ -24,16 +25,36 @@ namespace FinanzasPersonales.Services
         // Crear nueva transacción
         public async Task<Transaccion> CreateAsync(Transaccion transaccion)
         {
+            Validator.ValidateObject(transaccion, new ValidationContext(transaccion), validateAllProperties: true);
+            transaccion.Id = null;
             await _transacciones.InsertOneAsync(transaccion);
             return transaccion;
         }
 
         // Actualizar transacción existente
-        public async Task UpdateAsync(string id, Transaccion transaccion) =>
-            await _transacciones.ReplaceOneAsync(t => t.Id == id, transaccion);
+        public async Task UpdateAsync(string id, Transaccion transaccion)
+        {
+            Validator.ValidateObject(transaccion, new ValidationContext(transaccion), validateAllProperties: true);
+            transaccion.Id = id;
+            var result = await _transacciones.ReplaceOneAsync(t => t.Id == id, transaccion);
+            if (result.MatchedCount == 0)
+                throw new KeyNotFoundException($"Transacción con id {id} no encontrada.");
+        }
 
         // Eliminar transacción
-        public async Task DeleteAsync(string id) =>
-            await _transacciones.DeleteOneAsync(t => t.Id == id);
+        public async Task DeleteAsync(string id)
+        {
+            var result = await _transacciones.DeleteOneAsync(t => t.Id == id);
+            if (result.DeletedCount == 0)
+                throw new KeyNotFoundException($"Transacción con id {id} no encontrada.");
+        }
+
+        // Obtener transacciones por usuario
+        public async Task<List<Transaccion>> GetByUsuarioIdAsync(string usuarioId) =>
+            await _transacciones.Find(t => t.UsuarioId == usuarioId).ToListAsync();
+
+        // Obtener transacciones por categoría
+        public async Task<List<Transaccion>> GetByCategoriaAsync(string categoriaId) =>
+            await _transacciones.Find(t => t.CategoriaId == categoriaId).ToListAsync();
     }
 }

@@ -1,6 +1,7 @@
 using FinanzasPersonales.Database;
 using FinanzasPersonales.Models;
 using MongoDB.Driver;
+using System.ComponentModel.DataAnnotations;
 
 namespace FinanzasPersonales.Services
 {
@@ -24,7 +25,7 @@ namespace FinanzasPersonales.Services
         // Crear nueva categoría
         public async Task<Categoria> CreateAsync(Categoria categoria)
         {
-            // Eliminamos el id si viene definido para que MongoDB lo genere automáticamente
+            Validator.ValidateObject(categoria, new ValidationContext(categoria), validateAllProperties: true);
             categoria.Id = null;
             await _categorias.InsertOneAsync(categoria);
             return categoria;
@@ -33,8 +34,11 @@ namespace FinanzasPersonales.Services
         // Actualizar completamente (PUT)
         public async Task UpdateAsync(string id, Categoria categoria)
         {
-            categoria.Id = id; // Aseguramos que el id del objeto sea el de la ruta
-            await _categorias.ReplaceOneAsync(c => c.Id == id, categoria);
+            Validator.ValidateObject(categoria, new ValidationContext(categoria), validateAllProperties: true);
+            categoria.Id = id;
+            var result = await _categorias.ReplaceOneAsync(c => c.Id == id, categoria);
+            if (result.MatchedCount == 0)
+                throw new KeyNotFoundException($"Categoría con id {id} no encontrada.");
         }
 
         // Actualizar parcialmente (PATCH)
@@ -53,12 +57,23 @@ namespace FinanzasPersonales.Services
             if (!string.IsNullOrEmpty(partial.UsuarioId))
                 existing.UsuarioId = partial.UsuarioId;
 
+            // Validar el objeto actualizado antes de guardar
+            Validator.ValidateObject(existing, new ValidationContext(existing), validateAllProperties: true);
+            
             await _categorias.ReplaceOneAsync(c => c.Id == id, existing);
             return existing;
         }
 
+        // Obtener categorías por usuario
+        public async Task<List<Categoria>> GetByUsuarioIdAsync(string usuarioId) =>
+            await _categorias.Find(c => c.UsuarioId == usuarioId).ToListAsync();
+
         // Eliminar categoría
-        public async Task DeleteAsync(string id) =>
-            await _categorias.DeleteOneAsync(c => c.Id == id);
+        public async Task DeleteAsync(string id)
+        {
+            var result = await _categorias.DeleteOneAsync(c => c.Id == id);
+            if (result.DeletedCount == 0)
+                throw new KeyNotFoundException($"Categoría con id {id} no encontrada.");
+        }
     }
 }

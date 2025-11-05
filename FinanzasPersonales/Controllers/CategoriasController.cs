@@ -1,11 +1,13 @@
 using FinanzasPersonales.Models;
 using FinanzasPersonales.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FinanzasPersonales.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class CategoriasController : ControllerBase
 {
     private readonly CategoriaService _service;
@@ -33,6 +35,8 @@ public class CategoriasController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Categoria>> Create([FromBody] Categoria categoria)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
         await _service.CreateAsync(categoria);
         return CreatedAtAction(nameof(GetById), new { id = categoria.Id }, categoria);
     }
@@ -41,6 +45,8 @@ public class CategoriasController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] Categoria categoria)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
         var existente = await _service.GetByIdAsync(id);
         if (existente == null) return NotFound("Categoría no encontrada");
 

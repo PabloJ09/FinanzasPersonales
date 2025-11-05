@@ -1,11 +1,13 @@
 using FinanzasPersonales.Models;
 using FinanzasPersonales.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FinanzasPersonales.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class TransaccionesController : ControllerBase
 {
     private readonly TransaccionService _service;
@@ -33,6 +35,8 @@ public class TransaccionesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Transaccion>> Create([FromBody] Transaccion transaccion)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
         await _service.CreateAsync(transaccion);
         return CreatedAtAction(nameof(GetById), new { id = transaccion.Id }, transaccion);
     }
@@ -41,6 +45,8 @@ public class TransaccionesController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] Transaccion transaccion)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
         var existente = await _service.GetByIdAsync(id);
         if (existente == null) return NotFound("Transacción no encontrada");
 

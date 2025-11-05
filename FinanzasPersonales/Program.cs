@@ -4,6 +4,11 @@ using DotNetEnv;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
 using System;
 
 // ============================
@@ -37,13 +42,67 @@ builder.Services.AddSingleton<IMongoDBContext>(sp =>
 // 🔹 Registrar servicios de dominio
 builder.Services.AddScoped<CategoriaService>();
 builder.Services.AddScoped<TransaccionService>();
+builder.Services.AddScoped<UsuarioService>();
 
 // 🔹 Registrar controladores REST
 builder.Services.AddControllers();
 
-// 🔹 Agregar Swagger / OpenAPI
+// 🔹 Agregar Swagger / OpenAPI con soporte JWT
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "FinanzasPersonales",
+        Version = "v1",
+        Description = "API protegida con JWT para Finanzas Personales"
+    });
+
+    // 🔒 Configuración de seguridad JWT para Swagger
+    var jwtSecurityScheme = new OpenApiSecurityScheme
+    {
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Description = "Introduce tu token JWT en el formato: **Bearer {tu_token}**",
+        Reference = new OpenApiReference
+        {
+            Id = JwtBearerDefaults.AuthenticationScheme,
+            Type = ReferenceType.SecurityScheme
+        }
+    };
+
+    c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { jwtSecurityScheme, Array.Empty<string>() }
+    });
+});
+
+// 🔹 Configurar autenticación JWT
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    var key = builder.Configuration["Jwt:Key"] ?? string.Empty;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+        ValidateIssuer = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidateAudience = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidateLifetime = true
+    };
+});
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -58,6 +117,32 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Autenticación y autorización
+app.UseAuthentication();
+app.UseAuthorization();
+
+// 🔒 Proteger Swagger UI y JSON a menos que el usuario esté autenticado
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/swagger"))
+    {
+        // Permitir acceso libre a /api/Auth (registro y login)
+        if (context.Request.Path.StartsWithSegments("/api/Auth"))
+        {
+            await next();
+            return;
+        }
+
+        if (context.User?.Identity == null || !context.User.Identity.IsAuthenticated)
+        {
+            await context.ChallengeAsync();
+            return;
+        }
+    }
+    await next();
+});
+
 app.MapControllers();
 
 // ============================

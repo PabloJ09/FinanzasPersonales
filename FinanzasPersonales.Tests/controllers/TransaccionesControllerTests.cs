@@ -98,15 +98,22 @@ namespace FinanzasPersonales.Tests.Controllers
         public async Task Create_ReturnsCreatedAtAction()
         {
             // Arrange
-            var transaccion = new FinanzasPersonales.Models.Transaccion { Monto = 200 };
-            _mockCollection.Setup(c => c.InsertOneAsync(transaccion, null, default)).Returns(Task.CompletedTask);
+            var transaccion = new FinanzasPersonales.Models.Transaccion
+            {
+                Tipo = "Ingreso",
+                Monto = 200M,
+                CategoriaId = "cat1",
+                UsuarioId = "user1",
+                Descripcion = "Test"
+            };
+            _mockCollection.Setup(c => c.InsertOneAsync(It.IsAny<FinanzasPersonales.Models.Transaccion>(), null, default)).Returns(Task.CompletedTask);
 
             // Act
             var result = await _controller.Create(transaccion);
 
             // Assert
             var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            Assert.Equal(transaccion, createdResult.Value);
+            Assert.Equal(transaccion.Monto, ((FinanzasPersonales.Models.Transaccion)createdResult.Value).Monto);
         }
 
         [Fact]
@@ -134,7 +141,14 @@ namespace FinanzasPersonales.Tests.Controllers
         public async Task Update_ReturnsNoContent_WhenTransaccionExists()
         {
             // Arrange
-            var transaccion = new FinanzasPersonales.Models.Transaccion { Id = "1" };
+            var transaccion = new FinanzasPersonales.Models.Transaccion
+            {
+                Id = "1",
+                Tipo = "Gasto",
+                Monto = 50M,
+                CategoriaId = "cat1",
+                UsuarioId = "user1"
+            };
             var mockCursor = new Mock<MongoDB.Driver.IAsyncCursor<FinanzasPersonales.Models.Transaccion>>();
             mockCursor.SetupSequence(_ => _.MoveNextAsync(It.IsAny<System.Threading.CancellationToken>()))
                       .ReturnsAsync(true)

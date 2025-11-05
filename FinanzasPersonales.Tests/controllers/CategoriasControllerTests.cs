@@ -99,15 +99,16 @@ namespace FinanzasPersonales.Tests.Controllers
         public async Task Create_ReturnsCreatedAtAction()
         {
             // Arrange
-            var categoria = new Categoria { Nombre = "Nueva" };
-            _mockCollection.Setup(c => c.InsertOneAsync(categoria, null, default)).Returns(Task.CompletedTask);
+            var categoria = new Categoria { Nombre = "Nueva", Tipo = "Gasto", UsuarioId = "user1" };
+            _mockCollection.Setup(c => c.InsertOneAsync(It.IsAny<Categoria>(), null, default)).Returns(Task.CompletedTask);
 
             // Act
             var result = await _controller.Create(categoria);
 
             // Assert
             var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            Assert.Equal(categoria, createdResult.Value);
+            var created = Assert.IsType<Categoria>(createdResult.Value);
+            Assert.Equal(categoria.Nombre, created.Nombre);
         }
 
         [Fact]
@@ -135,7 +136,7 @@ namespace FinanzasPersonales.Tests.Controllers
         public async Task Update_ReturnsNoContent_WhenCategoriaExists()
         {
             // Arrange
-            var categoria = new Categoria { Id = "1" };
+            var categoria = new Categoria { Id = "1", Nombre = "Comida", Tipo = "Gasto", UsuarioId = "user1" };
             var mockCursor = new Mock<MongoDB.Driver.IAsyncCursor<Categoria>>();
             mockCursor.SetupSequence(_ => _.MoveNextAsync(It.IsAny<System.Threading.CancellationToken>()))
                       .ReturnsAsync(true)

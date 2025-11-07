@@ -1,6 +1,7 @@
 using MongoDB.Driver;
 using FinanzasPersonales.Models;
 
+using System.Diagnostics.CodeAnalysis;
 namespace FinanzasPersonales.Database
 {
     public interface IMongoDBContext

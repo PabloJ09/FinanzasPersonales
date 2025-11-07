@@ -1,6 +1,8 @@
 namespace FinanzasPersonales.Models
 {
     using System.ComponentModel.DataAnnotations;
+    using System.Diagnostics.CodeAnalysis;
+    [ExcludeFromCodeCoverage]
 
     public class Usuario
     {

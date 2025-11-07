@@ -117,6 +117,43 @@ namespace FinanzasPersonales.Tests.Services
         }
         #endregion
 
+            #region GetByUsuario Tests
+            [Fact]
+            public async Task GetByUsuarioIdAsync_ReturnsCategoriasForUsuario()
+            {
+                // Arrange
+                var usuarioId = "user1";
+                var categorias = new List<Categoria>
+                {
+                    new() { Id = "1", Nombre = "Comida", Tipo = "Gasto", UsuarioId = usuarioId },
+                    new() { Id = "2", Nombre = "Transporte", Tipo = "Gasto", UsuarioId = usuarioId }
+                };
+
+                var mockCursor = new Mock<IAsyncCursor<Categoria>>();
+                mockCursor.Setup(_ => _.Current).Returns(categorias);
+                mockCursor
+                    .SetupSequence(_ => _.MoveNextAsync(It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(true)
+                    .ReturnsAsync(false);
+
+                _mockCollection
+                    .Setup(c => c.FindAsync(
+                        It.IsAny<FilterDefinition<Categoria>>(),
+                        It.IsAny<FindOptions<Categoria, Categoria>>(),
+                        It.IsAny<CancellationToken>()
+                    ))
+                    .ReturnsAsync(mockCursor.Object);
+
+                // Act
+                var result = await _service.GetByUsuarioIdAsync(usuarioId);
+
+                // Assert
+                Assert.NotNull(result);
+                Assert.Equal(2, result.Count);
+                Assert.All(result, c => Assert.Equal(usuarioId, c.UsuarioId));
+            }
+            #endregion
+
         #region Create Tests
         [Fact]
         public async Task CreateAsync_InsertsCategoria()

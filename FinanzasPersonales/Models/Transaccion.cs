@@ -3,8 +3,10 @@ using MongoDB.Bson.Serialization.Attributes;
 using System;
 using System.ComponentModel.DataAnnotations;
 
+using System.Diagnostics.CodeAnalysis;
 namespace FinanzasPersonales.Models
 {
+    [ExcludeFromCodeCoverage]
     public class Transaccion
     {
         [BsonId]

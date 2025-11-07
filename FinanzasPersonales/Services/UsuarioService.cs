@@ -25,9 +25,15 @@ namespace FinanzasPersonales.Services
     public async Task<Usuario> RegisterAsync(string username, string password, string role = "usuario")
         {
             // Normalizar username
-            username = username.Trim().ToLowerInvariant();
+            username = username?.Trim().ToLowerInvariant() ?? string.Empty;
 
-            var exists = await _usuarios.Find(u => u.Username == username).FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("El nombre de usuario no puede estar vacío", nameof(username));
+
+            // Buscar usuario con FindAsync (más testeable que la extensión FirstOrDefaultAsync)
+            var cursorExists = await _usuarios.FindAsync(u => u.Username == username);
+            await cursorExists.MoveNextAsync();
+            var exists = cursorExists.Current.FirstOrDefault();
             if (exists != null) throw new InvalidOperationException("Usuario ya existe");
 
             var pw = HashPassword(password);
@@ -47,7 +53,9 @@ namespace FinanzasPersonales.Services
         public async Task<string> LoginAsync(string username, string password)
         {
             username = username.Trim().ToLowerInvariant();
-            var user = await _usuarios.Find(u => u.Username == username).FirstOrDefaultAsync();
+            var cursor = await _usuarios.FindAsync(u => u.Username == username);
+            await cursor.MoveNextAsync();
+            var user = cursor.Current.FirstOrDefault();
             if (user == null) throw new UnauthorizedAccessException("Credenciales inválidas");
             if (!user.IsActive) throw new UnauthorizedAccessException("Usuario no activado");
 
@@ -60,12 +68,14 @@ namespace FinanzasPersonales.Services
         public async Task<bool> IsActiveAsync(string username)
         {
             username = username.Trim().ToLowerInvariant();
-            var user = await _usuarios.Find(u => u.Username == username).FirstOrDefaultAsync();
+            var cursor = await _usuarios.FindAsync(u => u.Username == username);
+            await cursor.MoveNextAsync();
+            var user = cursor.Current.FirstOrDefault();
             return user?.IsActive ?? false;
         }
 
-        // Utilities
-        private string HashPassword(string password)
+    // Utilities
+    internal string HashPassword(string password)
         {
             // PBKDF2
             using var rng = RandomNumberGenerator.Create();
@@ -76,7 +86,7 @@ namespace FinanzasPersonales.Services
             return Convert.ToBase64String(salt) + ":" + Convert.ToBase64String(hash);
         }
 
-        private bool VerifyPassword(string password, string stored)
+    internal bool VerifyPassword(string password, string stored)
         {
             var parts = stored.Split(':');
             if (parts.Length != 2) return false;

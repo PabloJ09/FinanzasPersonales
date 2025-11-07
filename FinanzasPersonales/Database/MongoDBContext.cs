@@ -1,8 +1,11 @@
+
+using System.Diagnostics.CodeAnalysis;
 using MongoDB.Driver;
 using FinanzasPersonales.Models;
 
 namespace FinanzasPersonales.Database
 {
+    [ExcludeFromCodeCoverage]
     public class MongoDBContext : IMongoDBContext
     {
         private readonly IMongoDatabase _database;

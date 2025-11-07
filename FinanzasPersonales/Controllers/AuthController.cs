@@ -2,8 +2,12 @@ using FinanzasPersonales.Models;
 using FinanzasPersonales.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
+
 
 namespace FinanzasPersonales.Controllers;
+
+[ExcludeFromCodeCoverage]
 
 [ApiController]
 [Route("api/[controller]")]

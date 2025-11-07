@@ -113,7 +113,10 @@ namespace FinanzasPersonales.Tests.Controllers
 
             // Assert
             var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            Assert.Equal(transaccion.Monto, ((FinanzasPersonales.Models.Transaccion)createdResult.Value).Monto);
+            // Ensure Value is not null before accessing properties to satisfy nullable analysis
+            Assert.NotNull(createdResult.Value);
+            var created = Assert.IsType<FinanzasPersonales.Models.Transaccion>(createdResult.Value!);
+            Assert.Equal(transaccion.Monto, created.Monto);
         }
 
         [Fact]

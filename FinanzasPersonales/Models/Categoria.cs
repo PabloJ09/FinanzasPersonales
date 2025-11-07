@@ -2,8 +2,10 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System.ComponentModel.DataAnnotations;
 
+using System.Diagnostics.CodeAnalysis;
 namespace FinanzasPersonales.Models
 {
+    [ExcludeFromCodeCoverage]
     public class Categoria
     {
         [BsonId]

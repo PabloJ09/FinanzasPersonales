@@ -1,60 +1,123 @@
-using FinanzasPersonales.Database;
+using FinanzasPersonales.Common.Exceptions;
+using FinanzasPersonales.Database.Repositories;
 using FinanzasPersonales.Models;
-using MongoDB.Driver;
-using System.ComponentModel.DataAnnotations;
+using FluentValidation;
 
-namespace FinanzasPersonales.Services
+namespace FinanzasPersonales.Services;
+
+/// <summary>
+/// Servicio de dominio para Transacciones.
+/// Principio: Single Responsibility - Solo lógica de transacciones
+/// Principio: Dependency Inversion - Depende de IRepository, no de MongoDB directamente
+/// </summary>
+public interface ITransaccionService
 {
-    public class TransaccionService
+    Task<List<Transaccion>> GetAllAsync();
+    Task<Transaccion> GetByIdAsync(string id);
+    Task<Transaccion> CreateAsync(Transaccion transaccion);
+    Task<Transaccion> UpdateAsync(string id, Transaccion transaccion);
+    Task<List<Transaccion>> GetByUsuarioIdAsync(string usuarioId);
+    Task<List<Transaccion>> GetByCategoriaAsync(string categoriaId);
+    Task DeleteAsync(string id);
+}
+
+public class TransaccionService : ITransaccionService
+{
+    private readonly IRepository<Transaccion> _repository;
+    private readonly IValidator<Transaccion> _validator;
+
+    public TransaccionService(IRepository<Transaccion> repository, IValidator<Transaccion> validator)
     {
-        private readonly IMongoCollection<Transaccion> _transacciones;
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+    }
 
-        public TransaccionService(IMongoDBContext context)
+    public async Task<List<Transaccion>> GetAllAsync()
+    {
+        return await _repository.GetAllAsync();
+    }
+
+    public async Task<Transaccion> GetByIdAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
+
+        var transaccion = await _repository.GetByIdAsync(id);
+        if (transaccion == null)
+            throw new EntityNotFoundException(nameof(Transaccion), id);
+
+        return transaccion;
+    }
+
+    public async Task<Transaccion> CreateAsync(Transaccion transaccion)
+    {
+        if (transaccion == null)
+            throw new ArgumentNullException(nameof(transaccion));
+
+        // Validar la entidad
+        var validationResult = await _validator.ValidateAsync(transaccion);
+        if (!validationResult.IsValid)
         {
-            _transacciones = context.Transacciones;
+            var errors = validationResult.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            throw new Common.Exceptions.ValidationException(errors);
         }
 
-        // Obtener todas las transacciones
-        public async Task<List<Transaccion>> GetAsync() =>
-            await _transacciones.Find(_ => true).ToListAsync();
+        transaccion.Id = null;
+        return await _repository.AddAsync(transaccion);
+    }
 
-        // Obtener transacción por Id
-        public async Task<Transaccion?> GetByIdAsync(string id) =>
-            await _transacciones.Find(t => t.Id == id).FirstOrDefaultAsync();
+    public async Task<Transaccion> UpdateAsync(string id, Transaccion transaccion)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
 
-        // Crear nueva transacción
-        public async Task<Transaccion> CreateAsync(Transaccion transaccion)
+        if (transaccion == null)
+            throw new ArgumentNullException(nameof(transaccion));
+
+        // Validar que la entidad existe
+        var existing = await _repository.GetByIdAsync(id);
+        if (existing == null)
+            throw new EntityNotFoundException(nameof(Transaccion), id);
+
+        // Validar la entidad antes de actualizar
+        var validationResult = await _validator.ValidateAsync(transaccion);
+        if (!validationResult.IsValid)
         {
-            Validator.ValidateObject(transaccion, new ValidationContext(transaccion), validateAllProperties: true);
-            transaccion.Id = null;
-            await _transacciones.InsertOneAsync(transaccion);
-            return transaccion;
+            var errors = validationResult.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            throw new Common.Exceptions.ValidationException(errors);
         }
 
-        // Actualizar transacción existente
-        public async Task UpdateAsync(string id, Transaccion transaccion)
-        {
-            Validator.ValidateObject(transaccion, new ValidationContext(transaccion), validateAllProperties: true);
-            transaccion.Id = id;
-            var result = await _transacciones.ReplaceOneAsync(t => t.Id == id, transaccion);
-            if (result.MatchedCount == 0)
-                throw new KeyNotFoundException($"Transacción con id {id} no encontrada.");
-        }
+        transaccion.Id = id;
+        return await _repository.UpdateAsync(transaccion);
+    }
 
-        // Eliminar transacción
-        public async Task DeleteAsync(string id)
-        {
-            var result = await _transacciones.DeleteOneAsync(t => t.Id == id);
-            if (result.DeletedCount == 0)
-                throw new KeyNotFoundException($"Transacción con id {id} no encontrada.");
-        }
+    public async Task<List<Transaccion>> GetByUsuarioIdAsync(string usuarioId)
+    {
+        if (string.IsNullOrWhiteSpace(usuarioId))
+            throw new ArgumentNullException(nameof(usuarioId));
 
-        // Obtener transacciones por usuario
-        public async Task<List<Transaccion>> GetByUsuarioIdAsync(string usuarioId) =>
-            await _transacciones.Find(t => t.UsuarioId == usuarioId).ToListAsync();
+        return await _repository.FindAsync(t => t.UsuarioId == usuarioId);
+    }
 
-        // Obtener transacciones por categoría
-        public async Task<List<Transaccion>> GetByCategoriaAsync(string categoriaId) =>
-            await _transacciones.Find(t => t.CategoriaId == categoriaId).ToListAsync();
+    public async Task<List<Transaccion>> GetByCategoriaAsync(string categoriaId)
+    {
+        if (string.IsNullOrWhiteSpace(categoriaId))
+            throw new ArgumentNullException(nameof(categoriaId));
+
+        return await _repository.FindAsync(t => t.CategoriaId == categoriaId);
+    }
+
+    public async Task DeleteAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
+
+        var deleted = await _repository.DeleteAsync(id);
+        if (!deleted)
+            throw new EntityNotFoundException(nameof(Transaccion), id);
     }
 }

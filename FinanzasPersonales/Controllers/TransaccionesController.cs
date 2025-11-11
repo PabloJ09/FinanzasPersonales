@@ -1,67 +1,231 @@
 using FinanzasPersonales.Models;
 using FinanzasPersonales.Services;
+using FinanzasPersonales.Common.Results;
+using FinanzasPersonales.Common.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 
 namespace FinanzasPersonales.Controllers;
 
+/// <summary>
+/// Controlador de Transacciones.
+/// Principio: Single Responsibility - Solo maneja HTTP
+/// Principio: Dependency Inversion - Depende de ITransaccionService
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
 public class TransaccionesController : ControllerBase
 {
-    private readonly TransaccionService _service;
+    private readonly ITransaccionService _service;
 
-    public TransaccionesController(TransaccionService service)
+    public TransaccionesController(ITransaccionService service)
     {
-        _service = service;
+        _service = service ?? throw new ArgumentNullException(nameof(service));
     }
 
-    // GET: api/transacciones
+    /// <summary>
+    /// Obtiene todas las transacciones
+    /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<Transaccion>>> Get()
-        => Ok(await _service.GetAsync());
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<List<Transaccion>>>> Get()
+    {
+        try
+        {
+            var transacciones = await _service.GetAllAsync();
+            var response = new ApiResponse<List<Transaccion>>
+            {
+                Success = true,
+                Data = transacciones,
+                Message = "Transacciones obtenidas exitosamente"
+            };
+            return Ok(response);
+        }
+        catch (DomainException ex)
+        {
+            var response = new ApiResponse<List<Transaccion>>
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
+    }
 
-    // GET: api/transacciones/{id}
+    /// <summary>
+    /// Obtiene una transacción por su ID
+    /// </summary>
     [HttpGet("{id}")]
-    public async Task<ActionResult<Transaccion>> GetById(string id)
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<Transaccion>>> GetById(string id)
     {
-        var transaccion = await _service.GetByIdAsync(id);
-        if (transaccion == null) return NotFound("Transacción no encontrada");
-        return Ok(transaccion);
+        try
+        {
+            var transaccion = await _service.GetByIdAsync(id);
+            var response = new ApiResponse<Transaccion>
+            {
+                Success = true,
+                Data = transaccion,
+                Message = "Transacción obtenida exitosamente"
+            };
+            return Ok(response);
+        }
+        catch (EntityNotFoundException ex)
+        {
+            var response = new ApiResponse<Transaccion>
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code
+            };
+            return NotFound(response);
+        }
+        catch (DomainException ex)
+        {
+            var response = new ApiResponse<Transaccion>
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
     }
 
-    // POST: api/transacciones
+    /// <summary>
+    /// Crea una nueva transacción
+    /// </summary>
     [HttpPost]
-    public async Task<ActionResult<Transaccion>> Create([FromBody] Transaccion transaccion)
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<Transaccion>>> Create([FromBody] Transaccion transaccion)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
-        await _service.CreateAsync(transaccion);
-        return CreatedAtAction(nameof(GetById), new { id = transaccion.Id }, transaccion);
+        try
+        {
+            var creada = await _service.CreateAsync(transaccion);
+            var response = new ApiResponse<Transaccion>
+            {
+                Success = true,
+                Data = creada,
+                Message = "Transacción creada exitosamente"
+            };
+            return CreatedAtAction(nameof(GetById), new { id = creada.Id }, response);
+        }
+        catch (ValidationException ex)
+        {
+            var response = new ApiResponse<Transaccion>
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
+        catch (DomainException ex)
+        {
+            var response = new ApiResponse<Transaccion>
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
     }
 
-    // PUT: api/transacciones/{id}
+    /// <summary>
+    /// Actualiza completamente una transacción (PUT)
+    /// </summary>
     [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Update(string id, [FromBody] Transaccion transaccion)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
-        var existente = await _service.GetByIdAsync(id);
-        if (existente == null) return NotFound("Transacción no encontrada");
-
-        await _service.UpdateAsync(id, transaccion);
-        return NoContent();
+        try
+        {
+            await _service.UpdateAsync(id, transaccion);
+            return NoContent();
+        }
+        catch (EntityNotFoundException ex)
+        {
+            var response = new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code
+            };
+            return NotFound(response);
+        }
+        catch (ValidationException ex)
+        {
+            var response = new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
+        catch (DomainException ex)
+        {
+            var response = new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
     }
 
-    // DELETE: api/transacciones/{id}
+    /// <summary>
+    /// Elimina una transacción
+    /// </summary>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Delete(string id)
     {
-        var existente = await _service.GetByIdAsync(id);
-        if (existente == null) return NotFound("Transacción no encontrada");
-
-        await _service.DeleteAsync(id);
-        return NoContent();
+        try
+        {
+            await _service.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (EntityNotFoundException ex)
+        {
+            var response = new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code
+            };
+            return NotFound(response);
+        }
+        catch (DomainException ex)
+        {
+            var response = new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message,
+                Code = ex.Code,
+                Errors = ex.Errors
+            };
+            return BadRequest(response);
+        }
     }
 }

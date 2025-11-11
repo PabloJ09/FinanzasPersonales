@@ -1,79 +1,150 @@
-using FinanzasPersonales.Database;
+using FinanzasPersonales.Common.Exceptions;
+using FinanzasPersonales.Database.Repositories;
 using FinanzasPersonales.Models;
-using MongoDB.Driver;
-using System.ComponentModel.DataAnnotations;
+using FluentValidation;
 
-namespace FinanzasPersonales.Services
+namespace FinanzasPersonales.Services;
+
+/// <summary>
+/// Servicio de dominio para Categorías.
+/// Principio: Single Responsibility - Solo lógica de categorías
+/// Principio: Dependency Inversion - Depende de IRepository, no de MongoDB directamente
+/// </summary>
+public interface ICategoriaService
 {
-    public class CategoriaService
+    Task<List<Categoria>> GetAllAsync();
+    Task<Categoria> GetByIdAsync(string id);
+    Task<Categoria> CreateAsync(Categoria categoria);
+    Task<Categoria> UpdateAsync(string id, Categoria categoria);
+    Task<Categoria> UpdatePartialAsync(string id, Categoria partial);
+    Task<List<Categoria>> GetByUsuarioIdAsync(string usuarioId);
+    Task DeleteAsync(string id);
+}
+
+public class CategoriaService : ICategoriaService
+{
+    private readonly IRepository<Categoria> _repository;
+    private readonly IValidator<Categoria> _validator;
+
+    public CategoriaService(IRepository<Categoria> repository, IValidator<Categoria> validator)
     {
-        private readonly IMongoCollection<Categoria> _categorias;
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+    }
 
-        public CategoriaService(IMongoDBContext context)
+    public async Task<List<Categoria>> GetAllAsync()
+    {
+        return await _repository.GetAllAsync();
+    }
+
+    public async Task<Categoria> GetByIdAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
+
+        var categoria = await _repository.GetByIdAsync(id);
+        if (categoria == null)
+            throw new EntityNotFoundException(nameof(Categoria), id);
+
+        return categoria;
+    }
+
+    public async Task<Categoria> CreateAsync(Categoria categoria)
+    {
+        if (categoria == null)
+            throw new ArgumentNullException(nameof(categoria));
+
+        // Validar la entidad
+        var validationResult = await _validator.ValidateAsync(categoria);
+        if (!validationResult.IsValid)
         {
-            _categorias = context.Categorias;
+            var errors = validationResult.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            throw new Common.Exceptions.ValidationException(errors);
         }
 
-        // Obtener todas las categorías
-        public async Task<List<Categoria>> GetAsync() =>
-            await _categorias.Find(_ => true).ToListAsync();
+        categoria.Id = null;
+        return await _repository.AddAsync(categoria);
+    }
 
-        // Obtener categoría por Id
-        public async Task<Categoria?> GetByIdAsync(string id) =>
-            await _categorias.Find(c => c.Id == id).FirstOrDefaultAsync();
+    public async Task<Categoria> UpdateAsync(string id, Categoria categoria)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
 
-        // Crear nueva categoría
-        public async Task<Categoria> CreateAsync(Categoria categoria)
+        if (categoria == null)
+            throw new ArgumentNullException(nameof(categoria));
+
+        // Validar que la entidad existe
+        var existing = await _repository.GetByIdAsync(id);
+        if (existing == null)
+            throw new EntityNotFoundException(nameof(Categoria), id);
+
+        // Validar la entidad antes de actualizar
+        var validationResult = await _validator.ValidateAsync(categoria);
+        if (!validationResult.IsValid)
         {
-            Validator.ValidateObject(categoria, new ValidationContext(categoria), validateAllProperties: true);
-            categoria.Id = null;
-            await _categorias.InsertOneAsync(categoria);
-            return categoria;
+            var errors = validationResult.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            throw new Common.Exceptions.ValidationException(errors);
         }
 
-        // Actualizar completamente (PUT)
-        public async Task UpdateAsync(string id, Categoria categoria)
+        categoria.Id = id;
+        return await _repository.UpdateAsync(categoria);
+    }
+
+    public async Task<Categoria> UpdatePartialAsync(string id, Categoria partial)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
+
+        if (partial == null)
+            throw new ArgumentNullException(nameof(partial));
+
+        var existing = await _repository.GetByIdAsync(id);
+        if (existing == null)
+            throw new EntityNotFoundException(nameof(Categoria), id);
+
+        // Aplicar cambios parciales
+        if (!string.IsNullOrEmpty(partial.Nombre))
+            existing.Nombre = partial.Nombre;
+
+        if (!string.IsNullOrEmpty(partial.Tipo))
+            existing.Tipo = partial.Tipo;
+
+        if (!string.IsNullOrEmpty(partial.UsuarioId))
+            existing.UsuarioId = partial.UsuarioId;
+
+        // Validar el objeto actualizado
+        var validationResult = await _validator.ValidateAsync(existing);
+        if (!validationResult.IsValid)
         {
-            Validator.ValidateObject(categoria, new ValidationContext(categoria), validateAllProperties: true);
-            categoria.Id = id;
-            var result = await _categorias.ReplaceOneAsync(c => c.Id == id, categoria);
-            if (result.MatchedCount == 0)
-                throw new KeyNotFoundException($"Categoría con id {id} no encontrada.");
+            var errors = validationResult.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            throw new Common.Exceptions.ValidationException(errors);
         }
 
-        // Actualizar parcialmente (PATCH)
-        public async Task<Categoria?> UpdatePartialAsync(string id, Categoria partial)
-        {
-            var existing = await _categorias.Find(c => c.Id == id).FirstOrDefaultAsync();
-            if (existing == null) return null;
+        return await _repository.UpdateAsync(existing);
+    }
 
-            // Solo actualizamos los campos que tengan valor
-            if (!string.IsNullOrEmpty(partial.Nombre))
-                existing.Nombre = partial.Nombre;
+    public async Task<List<Categoria>> GetByUsuarioIdAsync(string usuarioId)
+    {
+        if (string.IsNullOrWhiteSpace(usuarioId))
+            throw new ArgumentNullException(nameof(usuarioId));
 
-            if (!string.IsNullOrEmpty(partial.Tipo))
-                existing.Tipo = partial.Tipo;
+        return await _repository.FindAsync(c => c.UsuarioId == usuarioId);
+    }
 
-            if (!string.IsNullOrEmpty(partial.UsuarioId))
-                existing.UsuarioId = partial.UsuarioId;
+    public async Task DeleteAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentNullException(nameof(id));
 
-            // Validar el objeto actualizado antes de guardar
-            Validator.ValidateObject(existing, new ValidationContext(existing), validateAllProperties: true);
-            
-            await _categorias.ReplaceOneAsync(c => c.Id == id, existing);
-            return existing;
-        }
-
-        // Obtener categorías por usuario
-        public async Task<List<Categoria>> GetByUsuarioIdAsync(string usuarioId) =>
-            await _categorias.Find(c => c.UsuarioId == usuarioId).ToListAsync();
-
-        // Eliminar categoría
-        public async Task DeleteAsync(string id)
-        {
-            var result = await _categorias.DeleteOneAsync(c => c.Id == id);
-            if (result.DeletedCount == 0)
-                throw new KeyNotFoundException($"Categoría con id {id} no encontrada.");
-        }
+        var deleted = await _repository.DeleteAsync(id);
+        if (!deleted)
+            throw new EntityNotFoundException(nameof(Categoria), id);
     }
 }

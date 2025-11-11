@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "V173hUhXBGPvdEW8rV0tlDKPXFTZkDq0MNpsL1Xudms=",
+  "Source": "FinanzasPersonales",
+  "BasePath": "_content/FinanzasPersonales",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}

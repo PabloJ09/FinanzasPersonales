@@ -1,6 +1,11 @@
 using FinanzasPersonales.Database;
+using FinanzasPersonales.Database.Repositories;
 using FinanzasPersonales.Services;
+using FinanzasPersonales.Validators;
+using FinanzasPersonales.Middleware;
+using FinanzasPersonales.Models;
 using DotNetEnv;
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -39,10 +44,39 @@ builder.Services.AddSingleton<IMongoDBContext>(sp =>
     return new MongoDBContext(settings);
 });
 
-// 🔹 Registrar servicios de dominio
-builder.Services.AddScoped<CategoriaService>();
-builder.Services.AddScoped<TransaccionService>();
-builder.Services.AddScoped<UsuarioService>();
+// 🔹 Registrar Unit of Work (Patrón Coordinator)
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// 🔹 Registrar Repositorios Genéricos (Principio: DRY y Dependency Inversion)
+builder.Services.AddScoped(sp =>
+{
+    var context = sp.GetRequiredService<IMongoDBContext>();
+    return new MongoRepository<Categoria>(context.Categorias);
+});
+builder.Services.AddScoped(sp =>
+{
+    var context = sp.GetRequiredService<IMongoDBContext>();
+    return new MongoRepository<Transaccion>(context.Transacciones);
+});
+builder.Services.AddScoped(sp =>
+{
+    var context = sp.GetRequiredService<IMongoDBContext>();
+    return new MongoRepository<Usuario>(context.Usuarios);
+});
+
+builder.Services.AddScoped<IRepository<Categoria>>(sp => sp.GetRequiredService<MongoRepository<Categoria>>());
+builder.Services.AddScoped<IRepository<Transaccion>>(sp => sp.GetRequiredService<MongoRepository<Transaccion>>());
+builder.Services.AddScoped<IRepository<Usuario>>(sp => sp.GetRequiredService<MongoRepository<Usuario>>());
+
+// 🔹 Registrar Validadores (Principio: Single Responsibility)
+builder.Services.AddScoped<IValidator<Categoria>, CategoriaValidator>();
+builder.Services.AddScoped<IValidator<Transaccion>, TransaccionValidator>();
+builder.Services.AddScoped<IValidator<Usuario>, UsuarioValidator>();
+
+// 🔹 Registrar servicios de dominio con sus interfaces (Principio: Dependency Inversion)
+builder.Services.AddScoped<ICategoriaService, CategoriaService>();
+builder.Services.AddScoped<ITransaccionService, TransaccionService>();
+builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 
 // 🔹 Registrar controladores REST
 builder.Services.AddControllers();
@@ -53,9 +87,14 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "FinanzasPersonales",
+        Title = "FinanzasPersonales API",
         Version = "v1",
-        Description = "API protegida con JWT para Finanzas Personales"
+        Description = "API RESTful protegida con JWT para Finanzas Personales",
+        Contact = new OpenApiContact
+        {
+            Name = "API Support",
+            Email = "support@finanzaspersonales.com"
+        }
     });
 
     // 🔒 Configuración de seguridad JWT para Swagger
@@ -79,6 +118,12 @@ builder.Services.AddSwaggerGen(c =>
     {
         { jwtSecurityScheme, Array.Empty<string>() }
     });
+
+    // Agregar XML comments si existen
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        c.IncludeXmlComments(xmlPath);
 });
 
 // 🔹 Configurar autenticación JWT
@@ -106,6 +151,27 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+    var logger = loggerFactory.CreateLogger("MongoIndexSetup");
+
+    var dbContext = services.GetRequiredService<IMongoDBContext>();
+    try
+    {
+        // Llamamos al setup de índices y esperamos que termine antes de exponer endpoints
+        await MongoIndexSetup.CreateIndexesAsync(dbContext, logger);
+        logger.LogInformation("Setup de índices finalizado correctamente.");
+    }
+    catch (System.Exception ex)
+    {
+        logger.LogError(ex, "Error al crear índices de MongoDB en inicio de la app.");
+        // Dependiendo de tu política: rethrow para detener el arranque, o solo log y continuar.
+        // throw;
+    }
+}
+
 // ============================
 // CONFIGURACIÓN DEL PIPELINE
 // ============================
@@ -117,6 +183,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// 🔹 Middleware de manejo centralizado de excepciones (Principio: Single Responsibility)
+app.UseGlobalExceptionHandler();
 
 // Autenticación y autorización
 app.UseAuthentication();

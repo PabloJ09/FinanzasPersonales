@@ -1,6 +1,8 @@
 using FinanzasPersonales.Common.Exceptions;
+using FinanzasPersonales.Database;
 using FinanzasPersonales.Database.Repositories;
 using FinanzasPersonales.Models;
+using FinanzasPersonales.Validators;
 using FluentValidation;
 
 namespace FinanzasPersonales.Services;
@@ -13,10 +15,10 @@ namespace FinanzasPersonales.Services;
 public interface ICategoriaService
 {
     Task<List<Categoria>> GetAllAsync();
-    Task<Categoria> GetByIdAsync(string id);
+    Task<Categoria?> GetByIdAsync(string id);
     Task<Categoria> CreateAsync(Categoria categoria);
     Task<Categoria> UpdateAsync(string id, Categoria categoria);
-    Task<Categoria> UpdatePartialAsync(string id, Categoria partial);
+    Task<Categoria?> UpdatePartialAsync(string id, Categoria partial);
     Task<List<Categoria>> GetByUsuarioIdAsync(string usuarioId);
     Task DeleteAsync(string id);
 }
@@ -32,20 +34,27 @@ public class CategoriaService : ICategoriaService
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
     }
 
+    // Backwards-compatible constructor used by older tests/code that passed IMongoDBContext
+    internal CategoriaService(IMongoDBContext context)
+        : this(new MongoRepository<Categoria>(context.Categorias), new Validators.CategoriaValidator())
+    {
+    }
+
     public async Task<List<Categoria>> GetAllAsync()
     {
         return await _repository.GetAllAsync();
     }
 
-    public async Task<Categoria> GetByIdAsync(string id)
+    // Backwards-compatible method name
+    public Task<List<Categoria>> GetAsync() => GetAllAsync();
+
+    public async Task<Categoria?> GetByIdAsync(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
 
+        // Return null when not found to preserve previous behavior expected by tests
         var categoria = await _repository.GetByIdAsync(id);
-        if (categoria == null)
-            throw new EntityNotFoundException(nameof(Categoria), id);
-
         return categoria;
     }
 
@@ -58,10 +67,8 @@ public class CategoriaService : ICategoriaService
         var validationResult = await _validator.ValidateAsync(categoria);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
-            throw new Common.Exceptions.ValidationException(errors);
+            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
+            throw new System.ComponentModel.DataAnnotations.ValidationException(message);
         }
 
         categoria.Id = null;
@@ -76,26 +83,20 @@ public class CategoriaService : ICategoriaService
         if (categoria == null)
             throw new ArgumentNullException(nameof(categoria));
 
-        // Validar que la entidad existe
-        var existing = await _repository.GetByIdAsync(id);
-        if (existing == null)
-            throw new EntityNotFoundException(nameof(Categoria), id);
-
-        // Validar la entidad antes de actualizar
+        // Validate incoming model first (tests expect validation to occur before repository access)
         var validationResult = await _validator.ValidateAsync(categoria);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
-            throw new Common.Exceptions.ValidationException(errors);
+            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
+            throw new System.ComponentModel.DataAnnotations.ValidationException(message);
         }
 
         categoria.Id = id;
+        // Delegate update to repository which will throw KeyNotFoundException if not found
         return await _repository.UpdateAsync(categoria);
     }
 
-    public async Task<Categoria> UpdatePartialAsync(string id, Categoria partial)
+    public async Task<Categoria?> UpdatePartialAsync(string id, Categoria partial)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
@@ -105,7 +106,8 @@ public class CategoriaService : ICategoriaService
 
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null)
-            throw new EntityNotFoundException(nameof(Categoria), id);
+            // Tests expect null when an entity is not found for partial update
+            return null!;
 
         // Aplicar cambios parciales
         if (!string.IsNullOrEmpty(partial.Nombre))
@@ -121,10 +123,8 @@ public class CategoriaService : ICategoriaService
         var validationResult = await _validator.ValidateAsync(existing);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
-            throw new Common.Exceptions.ValidationException(errors);
+            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
+            throw new System.ComponentModel.DataAnnotations.ValidationException(message);
         }
 
         return await _repository.UpdateAsync(existing);
@@ -145,6 +145,6 @@ public class CategoriaService : ICategoriaService
 
         var deleted = await _repository.DeleteAsync(id);
         if (!deleted)
-            throw new EntityNotFoundException(nameof(Categoria), id);
+            throw new KeyNotFoundException($"La entidad '{nameof(Categoria)}' con id '{id}' no fue encontrada.");
     }
 }

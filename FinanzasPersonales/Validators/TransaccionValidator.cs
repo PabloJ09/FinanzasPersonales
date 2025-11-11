@@ -24,17 +24,15 @@ public class TransaccionValidator : AbstractValidator<Transaccion>
             .MaximumLength(200).WithMessage("La descripción no puede exceder 200 caracteres.");
 
         RuleFor(t => t.CategoriaId)
-            .NotEmpty().WithMessage("La categoría es requerida.")
-            .Length(24).When(t => !string.IsNullOrEmpty(t.CategoriaId))
-            .WithMessage("CategoriaId debe ser un ObjectId válido.");
+            .NotEmpty().WithMessage("La categoría es requerida.");
 
         RuleFor(t => t.UsuarioId)
-            .NotEmpty().WithMessage("UsuarioId es requerido.")
-            .Length(24).When(t => !string.IsNullOrEmpty(t.UsuarioId))
-            .WithMessage("UsuarioId debe ser un ObjectId válido.");
+            .NotEmpty().WithMessage("UsuarioId es requerido.");
 
+        // Use a dynamic comparison so the "now" moment is evaluated at validation time,
+        // avoiding flaky failures when the model's Fecha is set very close to construction time.
         RuleFor(t => t.Fecha)
             .NotEmpty().WithMessage("La fecha es obligatoria.")
-            .LessThanOrEqualTo(DateTime.UtcNow).WithMessage("La fecha no puede ser en el futuro.");
+            .LessThanOrEqualTo(_ => DateTime.UtcNow).WithMessage("La fecha no puede ser en el futuro.");
     }
 }

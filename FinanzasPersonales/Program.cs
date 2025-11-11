@@ -44,42 +44,44 @@ builder.Services.AddSingleton<IMongoDBContext>(sp =>
     return new MongoDBContext(settings);
 });
 
+// 🔹 Contexto de base de datos MongoDB
+builder.Services.AddSingleton<IMongoDBContext, MongoDBContext>();
+
 // 🔹 Registrar Unit of Work (Patrón Coordinator)
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // 🔹 Registrar Repositorios Genéricos (Principio: DRY y Dependency Inversion)
-builder.Services.AddScoped(sp =>
+builder.Services.AddScoped<IRepository<Categoria>>(sp =>
 {
     var context = sp.GetRequiredService<IMongoDBContext>();
     return new MongoRepository<Categoria>(context.Categorias);
 });
-builder.Services.AddScoped(sp =>
+
+builder.Services.AddScoped<IRepository<Transaccion>>(sp =>
 {
     var context = sp.GetRequiredService<IMongoDBContext>();
     return new MongoRepository<Transaccion>(context.Transacciones);
 });
-builder.Services.AddScoped(sp =>
+
+builder.Services.AddScoped<IRepository<Usuario>>(sp =>
 {
     var context = sp.GetRequiredService<IMongoDBContext>();
     return new MongoRepository<Usuario>(context.Usuarios);
 });
-
-builder.Services.AddScoped<IRepository<Categoria>>(sp => sp.GetRequiredService<MongoRepository<Categoria>>());
-builder.Services.AddScoped<IRepository<Transaccion>>(sp => sp.GetRequiredService<MongoRepository<Transaccion>>());
-builder.Services.AddScoped<IRepository<Usuario>>(sp => sp.GetRequiredService<MongoRepository<Usuario>>());
 
 // 🔹 Registrar Validadores (Principio: Single Responsibility)
 builder.Services.AddScoped<IValidator<Categoria>, CategoriaValidator>();
 builder.Services.AddScoped<IValidator<Transaccion>, TransaccionValidator>();
 builder.Services.AddScoped<IValidator<Usuario>, UsuarioValidator>();
 
-// 🔹 Registrar servicios de dominio con sus interfaces (Principio: Dependency Inversion)
-builder.Services.AddScoped<ICategoriaService, CategoriaService>();
-builder.Services.AddScoped<ITransaccionService, TransaccionService>();
-builder.Services.AddScoped<IUsuarioService, UsuarioService>();
+// 🔹 Registrar Servicios de Dominio (Principio: Dependency Inversion)
+builder.Services.AddScoped<CategoriaService>();
+builder.Services.AddScoped<TransaccionService>();
+builder.Services.AddScoped<UsuarioService>();
 
-// 🔹 Registrar controladores REST
+// 🔹 Registrar Controladores REST
 builder.Services.AddControllers();
+
 
 // 🔹 Agregar Swagger / OpenAPI con soporte JWT
 builder.Services.AddEndpointsApiExplorer();

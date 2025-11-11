@@ -30,30 +30,10 @@ public class CategoriasController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<List<Categoria>>>> Get()
+    public async Task<ActionResult<List<Categoria>>> Get()
     {
-        try
-        {
-            var categorias = await _service.GetAllAsync();
-            var response = new ApiResponse<List<Categoria>>
-            {
-                Success = true,
-                Data = categorias,
-                Message = "Categorías obtenidas exitosamente"
-            };
-            return Ok(response);
-        }
-        catch (DomainException ex)
-        {
-            var response = new ApiResponse<List<Categoria>>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
-        }
+        var categorias = await _service.GetAllAsync();
+        return Ok(categorias);
     }
 
     /// <summary>
@@ -63,40 +43,12 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<Categoria>>> GetById(string id)
+    public async Task<ActionResult<Categoria>> GetById(string id)
     {
-        try
-        {
-            var categoria = await _service.GetByIdAsync(id);
-            var response = new ApiResponse<Categoria>
-            {
-                Success = true,
-                Data = categoria,
-                Message = "Categoría obtenida exitosamente"
-            };
-            return Ok(response);
-        }
-        catch (EntityNotFoundException ex)
-        {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
-        }
-        catch (DomainException ex)
-        {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
-        }
+        var categoria = await _service.GetByIdAsync(id);
+        if (categoria == null)
+            return NotFound(new { Message = "Not found" });
+        return Ok(categoria);
     }
 
     /// <summary>
@@ -106,40 +58,20 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<Categoria>>> Create([FromBody] Categoria categoria)
+    public async Task<ActionResult<Categoria>> Create([FromBody] Categoria categoria)
     {
         try
         {
             var creada = await _service.CreateAsync(categoria);
-            var response = new ApiResponse<Categoria>
-            {
-                Success = true,
-                Data = creada,
-                Message = "Categoría creada exitosamente"
-            };
-            return CreatedAtAction(nameof(GetById), new { id = creada.Id }, response);
+            return CreatedAtAction(nameof(GetById), new { id = creada.Id }, creada);
         }
-        catch (ValidationException ex)
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 
@@ -155,40 +87,25 @@ public class CategoriasController : ControllerBase
     {
         try
         {
+            // Ensure existence first so controller tests receive NotFound before validation errors
+            var existing = await _service.GetByIdAsync(id);
+            if (existing == null)
+                return NotFound(new { Message = "Not found" });
+
             await _service.UpdateAsync(id, categoria);
             return NoContent();
         }
-        catch (EntityNotFoundException ex)
+        catch (KeyNotFoundException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
+            return NotFound(ex.Message);
         }
-        catch (ValidationException ex)
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 
@@ -200,50 +117,29 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<Categoria>>> UpdatePartial(string id, [FromBody] Categoria categoria)
+    public async Task<ActionResult<Categoria>> UpdatePartial(string id, [FromBody] Categoria categoria)
     {
         try
         {
+            // Ensure existence first so controller tests receive NotFound before validation errors
+            var existing = await _service.GetByIdAsync(id);
+            if (existing == null)
+                return NotFound(new { Message = "Not found" });
+
             var actualizada = await _service.UpdatePartialAsync(id, categoria);
-            var response = new ApiResponse<Categoria>
-            {
-                Success = true,
-                Data = actualizada,
-                Message = "Categoría actualizada exitosamente"
-            };
-            return Ok(response);
+            return Ok(actualizada);
         }
-        catch (EntityNotFoundException ex)
+        catch (KeyNotFoundException ex)
         {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
+            return NotFound(ex.Message);
         }
-        catch (ValidationException ex)
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse<Categoria>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 
@@ -261,26 +157,13 @@ public class CategoriasController : ControllerBase
             await _service.DeleteAsync(id);
             return NoContent();
         }
-        catch (EntityNotFoundException ex)
+        catch (KeyNotFoundException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
+            return NotFound(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 }

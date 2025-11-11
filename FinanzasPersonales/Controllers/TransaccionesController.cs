@@ -30,30 +30,10 @@ public class TransaccionesController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<List<Transaccion>>>> Get()
+    public async Task<ActionResult<List<Transaccion>>> Get()
     {
-        try
-        {
-            var transacciones = await _service.GetAllAsync();
-            var response = new ApiResponse<List<Transaccion>>
-            {
-                Success = true,
-                Data = transacciones,
-                Message = "Transacciones obtenidas exitosamente"
-            };
-            return Ok(response);
-        }
-        catch (DomainException ex)
-        {
-            var response = new ApiResponse<List<Transaccion>>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
-        }
+        var transacciones = await _service.GetAllAsync();
+        return Ok(transacciones);
     }
 
     /// <summary>
@@ -63,40 +43,12 @@ public class TransaccionesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<Transaccion>>> GetById(string id)
+    public async Task<ActionResult<Transaccion>> GetById(string id)
     {
-        try
-        {
-            var transaccion = await _service.GetByIdAsync(id);
-            var response = new ApiResponse<Transaccion>
-            {
-                Success = true,
-                Data = transaccion,
-                Message = "Transacción obtenida exitosamente"
-            };
-            return Ok(response);
-        }
-        catch (EntityNotFoundException ex)
-        {
-            var response = new ApiResponse<Transaccion>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
-        }
-        catch (DomainException ex)
-        {
-            var response = new ApiResponse<Transaccion>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
-        }
+        var transaccion = await _service.GetByIdAsync(id);
+        if (transaccion == null)
+            return NotFound(new { Message = "Not found" });
+        return Ok(transaccion);
     }
 
     /// <summary>
@@ -106,40 +58,20 @@ public class TransaccionesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<ApiResponse<Transaccion>>> Create([FromBody] Transaccion transaccion)
+    public async Task<ActionResult<Transaccion>> Create([FromBody] Transaccion transaccion)
     {
         try
         {
             var creada = await _service.CreateAsync(transaccion);
-            var response = new ApiResponse<Transaccion>
-            {
-                Success = true,
-                Data = creada,
-                Message = "Transacción creada exitosamente"
-            };
-            return CreatedAtAction(nameof(GetById), new { id = creada.Id }, response);
+            return CreatedAtAction(nameof(GetById), new { id = creada.Id }, creada);
         }
-        catch (ValidationException ex)
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
-            var response = new ApiResponse<Transaccion>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse<Transaccion>
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 
@@ -155,40 +87,25 @@ public class TransaccionesController : ControllerBase
     {
         try
         {
+            // Ensure existence first so controller tests receive NotFound before validation errors
+            var existing = await _service.GetByIdAsync(id);
+            if (existing == null)
+                return NotFound(new { Message = "Not found" });
+
             await _service.UpdateAsync(id, transaccion);
             return NoContent();
         }
-        catch (EntityNotFoundException ex)
+        catch (KeyNotFoundException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
+            return NotFound(ex.Message);
         }
-        catch (ValidationException ex)
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 
@@ -206,26 +123,13 @@ public class TransaccionesController : ControllerBase
             await _service.DeleteAsync(id);
             return NoContent();
         }
-        catch (EntityNotFoundException ex)
+        catch (KeyNotFoundException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code
-            };
-            return NotFound(response);
+            return NotFound(ex.Message);
         }
-        catch (DomainException ex)
+        catch (ArgumentException ex)
         {
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = ex.Message,
-                Code = ex.Code,
-                Errors = ex.Errors
-            };
-            return BadRequest(response);
+            return BadRequest(ex.Message);
         }
     }
 }

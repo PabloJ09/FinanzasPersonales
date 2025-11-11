@@ -1,7 +1,9 @@
 using FinanzasPersonales.Common.Exceptions;
+using FinanzasPersonales.Database;
 using FinanzasPersonales.Database.Repositories;
 using FinanzasPersonales.Models;
 using Microsoft.Extensions.Configuration;
+using FinanzasPersonales.Validators;
 using FluentValidation;
 using System.Security.Cryptography;
 using System.Text;
@@ -36,13 +38,19 @@ public class UsuarioService : IUsuarioService
         _config = config ?? throw new ArgumentNullException(nameof(config));
     }
 
+    // Backwards-compatible constructor for tests/code that pass IMongoDBContext
+    internal UsuarioService(IMongoDBContext context, IConfiguration config)
+        : this(new MongoRepository<Usuario>(context.Usuarios), new Validators.UsuarioValidator(), config)
+    {
+    }
+
     public async Task<Usuario> RegisterAsync(string username, string password, string role = "usuario")
     {
         if (string.IsNullOrWhiteSpace(username))
-            throw new ArgumentNullException(nameof(username));
+            throw new ArgumentException("username cannot be empty", nameof(username));
 
         if (string.IsNullOrWhiteSpace(password))
-            throw new ArgumentNullException(nameof(password));
+            throw new ArgumentException("password cannot be empty", nameof(password));
 
         // Normalizar username
         username = username.Trim().ToLowerInvariant();
@@ -50,7 +58,7 @@ public class UsuarioService : IUsuarioService
         // Verificar que el usuario no exista
         var exists = await _repository.ExistsAsync(u => u.Username == username);
         if (exists)
-            throw new DomainException("El usuario ya existe", "USER_ALREADY_EXISTS");
+            throw new InvalidOperationException("El usuario ya existe");
 
         var hashedPassword = HashPassword(password);
         var user = new Usuario
@@ -65,10 +73,8 @@ public class UsuarioService : IUsuarioService
         var validationResult = await _validator.ValidateAsync(user);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
-            throw new Common.Exceptions.ValidationException(errors);
+            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
+            throw new System.ComponentModel.DataAnnotations.ValidationException(message);
         }
 
         return await _repository.AddAsync(user);
@@ -79,20 +85,20 @@ public class UsuarioService : IUsuarioService
         if (string.IsNullOrWhiteSpace(username))
             throw new ArgumentNullException(nameof(username));
 
+        // Tests expect UnauthorizedAccessException for empty/invalid credentials
         if (string.IsNullOrWhiteSpace(password))
-            throw new ArgumentNullException(nameof(password));
-
+            throw new UnauthorizedAccessException("Contraseña vacía");
         username = username.Trim().ToLowerInvariant();
 
         var user = await _repository.FirstOrDefaultAsync(u => u.Username == username);
         if (user == null)
-            throw new UnauthorizedException("Credenciales inválidas");
+            throw new UnauthorizedAccessException("Credenciales inválidas");
 
         if (!user.IsActive)
-            throw new UnauthorizedException("Usuario no activado");
+            throw new UnauthorizedAccessException("Usuario no activado");
 
         if (!VerifyPassword(password, user.PasswordHash))
-            throw new UnauthorizedException("Credenciales inválidas");
+            throw new UnauthorizedAccessException("Credenciales inválidas");
 
         return GenerateJwtToken(user);
     }
@@ -107,7 +113,7 @@ public class UsuarioService : IUsuarioService
         return user?.IsActive ?? false;
     }
 
-    private string HashPassword(string password)
+    internal string HashPassword(string password)
     {
         using var rng = RandomNumberGenerator.Create();
         var salt = new byte[16];

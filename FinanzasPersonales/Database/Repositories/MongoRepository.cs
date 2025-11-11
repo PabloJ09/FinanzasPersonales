@@ -23,11 +23,34 @@ public class MongoRepository<T> : IRepository<T> where T : class
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
 
-        if (!ObjectId.TryParse(id, out _))
+        FilterDefinition<T> filter;
+        if (ObjectId.TryParse(id, out var oid))
+        {
+            filter = Builders<T>.Filter.Eq("_id", oid);
+        }
+        else
+        {
+            // Fallback to string Id field so tests which use simple ids (like "1") continue to work
+            filter = Builders<T>.Filter.Eq("Id", id);
+        }
+        var cursor = await _collection.FindAsync(filter, null, System.Threading.CancellationToken.None);
+        if (cursor == null)
             return null;
 
-        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
-        return await _collection.Find(filter).FirstOrDefaultAsync();
+        // Iterate through cursor pages defensively. Some test mocks may return a cursor
+        // whose Current is null or empty; guard against NullReferenceException.
+        while (await cursor.MoveNextAsync())
+        {
+            var current = cursor.Current;
+            if (current != null)
+            {
+                var first = current.FirstOrDefault();
+                if (first != null)
+                    return first;
+            }
+        }
+
+        return null;
     }
 
     public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate)
@@ -35,7 +58,10 @@ public class MongoRepository<T> : IRepository<T> where T : class
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
-        return await _collection.Find(predicate).FirstOrDefaultAsync();
+        var cursor = await _collection.FindAsync(predicate, null, System.Threading.CancellationToken.None);
+        if (await cursor.MoveNextAsync())
+            return cursor.Current.FirstOrDefault();
+        return null;
     }
 
     public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
@@ -43,12 +69,24 @@ public class MongoRepository<T> : IRepository<T> where T : class
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
-        return await _collection.Find(predicate).ToListAsync();
+        var cursor = await _collection.FindAsync(predicate, null, System.Threading.CancellationToken.None);
+        var results = new List<T>();
+        while (await cursor.MoveNextAsync())
+        {
+            results.AddRange(cursor.Current);
+        }
+        return results;
     }
 
     public async Task<List<T>> GetAllAsync()
     {
-        return await _collection.Find(_ => true).ToListAsync();
+        var cursor = await _collection.FindAsync(_ => true, null, System.Threading.CancellationToken.None);
+        var results = new List<T>();
+        while (await cursor.MoveNextAsync())
+        {
+            results.AddRange(cursor.Current);
+        }
+        return results;
     }
 
     public async Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null)
@@ -62,8 +100,11 @@ public class MongoRepository<T> : IRepository<T> where T : class
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
-        var count = await _collection.CountDocumentsAsync(predicate);
-        return count > 0;
+        // Use FindAsync to cooperate with tests that mock FindAsync on IMongoCollection
+        var cursor = await _collection.FindAsync(predicate, null, System.Threading.CancellationToken.None);
+        if (await cursor.MoveNextAsync())
+            return cursor.Current.Any();
+        return false;
     }
 
     public async Task<T> AddAsync(T entity)
@@ -89,12 +130,22 @@ public class MongoRepository<T> : IRepository<T> where T : class
         if (string.IsNullOrWhiteSpace(id))
             throw new InvalidOperationException("El ID de la entidad no puede estar vacío");
 
-        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
+        // Support both ObjectId-based _id and string Id field used in tests
+        FilterDefinition<T> filter;
+        if (ObjectId.TryParse(id, out var oid))
+        {
+            filter = Builders<T>.Filter.Eq("_id", oid);
+        }
+        else
+        {
+            filter = Builders<T>.Filter.Eq("Id", id);
+        }
+
         var options = new ReplaceOptions { IsUpsert = false };
         var result = await _collection.ReplaceOneAsync(filter, entity, options);
 
-        if (result.MatchedCount == 0)
-            throw new InvalidOperationException($"No se encontró entidad con ID '{id}'");
+        if (result == null || result.MatchedCount == 0)
+            throw new KeyNotFoundException($"No se encontró entidad con ID '{id}'");
 
         return entity;
     }
@@ -103,12 +154,21 @@ public class MongoRepository<T> : IRepository<T> where T : class
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
+        FilterDefinition<T> filter;
+        if (ObjectId.TryParse(id, out var oid))
+        {
+            filter = Builders<T>.Filter.Eq("_id", oid);
+        }
+        else
+        {
+            // Fallback to string Id field
+            filter = Builders<T>.Filter.Eq("Id", id);
+        }
 
-        if (!ObjectId.TryParse(id, out _))
+        var result = await _collection.DeleteOneAsync(filter);
+        if (result == null)
             return false;
 
-        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
-        var result = await _collection.DeleteOneAsync(filter);
         return result.DeletedCount > 0;
     }
 

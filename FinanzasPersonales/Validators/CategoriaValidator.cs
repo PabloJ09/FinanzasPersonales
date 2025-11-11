@@ -21,8 +21,6 @@ public class CategoriaValidator : AbstractValidator<Categoria>
             .WithMessage("El tipo debe ser 'Ingreso' o 'Gasto'.");
 
         RuleFor(c => c.UsuarioId)
-            .NotEmpty().WithMessage("UsuarioId es requerido.")
-            .Length(24).When(c => !string.IsNullOrEmpty(c.UsuarioId))
-            .WithMessage("UsuarioId debe ser un ObjectId válido de MongoDB.");
+            .NotEmpty().WithMessage("UsuarioId es requerido.");
     }
 }

@@ -5,8 +5,11 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace FinanzasPersonales.Database
 {
+    [ExcludeFromCodeCoverage]
     public static class MongoIndexSetup
     {
         

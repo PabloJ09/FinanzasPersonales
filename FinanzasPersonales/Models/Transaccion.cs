@@ -26,9 +26,7 @@ namespace FinanzasPersonales.Models
 
         [Required(ErrorMessage = "La categoría es requerida.")]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string CategoriaId { get; set; } = null!;
-
-        [Required(ErrorMessage = "La fecha es obligatoria.")]
+        public string CategoriaId { get; set; } = null!;        [Required(ErrorMessage = "La fecha es obligatoria.")]
         public DateTime Fecha { get; set; } = DateTime.UtcNow;
 
         [Required(ErrorMessage = "UsuarioId es requerido.")]

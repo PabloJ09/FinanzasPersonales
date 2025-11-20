@@ -5,8 +5,7 @@ namespace FinanzasPersonales.Tests.Integration
 {
     /// <summary>
     /// Fixture que maneja conexión a MongoDB local para pruebas de integración.
-    /// Requiere: MongoDB ejecutándose en localhost:27017
-    /// Para levantar localmente: docker run -d -p 27017:27017 --name mongodb mongo:latest
+    /// Requiere: MongoDB ejecutándose en `localhost:27017` (levantar la instancia localmente antes de ejecutar tests)
     /// </summary>
     public class MongoDbFixture : IAsyncLifetime
     {
@@ -35,8 +34,7 @@ namespace FinanzasPersonales.Tests.Integration
             {
                 throw new InvalidOperationException(
                     "No se puede conectar a MongoDB en localhost:27017. " +
-                    "Por favor, inicia MongoDB localmente o con Docker:\n" +
-                    "docker run -d -p 27017:27017 --name mongodb mongo:latest",
+                    "Por favor, inicia MongoDB localmente antes de ejecutar las pruebas.",
                     ex
                 );
             }

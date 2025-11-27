@@ -75,9 +75,10 @@ builder.Services.AddScoped<IValidator<Transaccion>, TransaccionValidator>();
 builder.Services.AddScoped<IValidator<Usuario>, UsuarioValidator>();
 
 // 🔹 Registrar Servicios de Dominio (Principio: Dependency Inversion)
-builder.Services.AddScoped<CategoriaService>();
-builder.Services.AddScoped<TransaccionService>();
-builder.Services.AddScoped<UsuarioService>();
+builder.Services.AddScoped<ICategoriaService, CategoriaService>();
+builder.Services.AddScoped<ITransaccionService, TransaccionService>();
+builder.Services.AddScoped<IUsuarioService, UsuarioService>();
+
 
 // 🔹 Registrar Controladores REST
 builder.Services.AddControllers();
@@ -187,7 +188,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 // 🔹 Middleware de manejo centralizado de excepciones (Principio: Single Responsibility)
-app.UseGlobalExceptionHandler();
+//app.UseGlobalExceptionHandler();
 
 // Autenticación y autorización
 app.UseAuthentication();

@@ -21,7 +21,6 @@ namespace FinanzasPersonales.Models
         public string Tipo { get; set; } = null!; // "Ingreso" o "Gasto"
 
         [Required(ErrorMessage = "UsuarioId es requerido.")]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string UsuarioId { get; set; } = null!; // Categorías personalizadas por usuario
+        public string UsuarioId { get; set; } = null!; // Categorías personalizadas por usuario (viene del JWT)
     }
 }

@@ -1,9 +1,11 @@
 using FinanzasPersonales.Models;
+using FinanzasPersonales.Models.DTOs;
 using FinanzasPersonales.Services;
 using FinanzasPersonales.Common.Results;
 using FinanzasPersonales.Common.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace FinanzasPersonales.Controllers;
 
@@ -25,6 +27,22 @@ public class CategoriasController : ControllerBase
     }
 
     /// <summary>
+    /// Extrae el userId del JWT
+    /// </summary>
+    private string GetUserId()
+    {
+        var userId =
+            User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+            User.FindFirst("usuarioId")?.Value ??
+            User.FindFirst("id")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+            throw new UnauthorizedAccessException("UserId not found in token");
+
+        return userId;
+    }
+
+    /// <summary>
     /// Obtiene todas las categorías del usuario autenticado
     /// </summary>
     [HttpGet]
@@ -32,7 +50,8 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<Categoria>>> Get()
     {
-        var categorias = await _service.GetAllAsync();
+        var userId = GetUserId();
+        var categorias = await _service.GetAllAsync(userId);
         return Ok(categorias);
     }
 
@@ -45,7 +64,8 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<Categoria>> GetById(string id)
     {
-        var categoria = await _service.GetByIdAsync(id);
+        var userId = GetUserId();
+        var categoria = await _service.GetByIdAsync(id, userId);
         if (categoria == null)
             return NotFound(new { Message = "Not found" });
         return Ok(categoria);
@@ -58,10 +78,19 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<Categoria>> Create([FromBody] Categoria categoria)
+    public async Task<ActionResult<Categoria>> Create([FromBody] CategoriaCreateDto dto)
     {
         try
         {
+            var userId = GetUserId();
+
+            var categoria = new Categoria
+            {
+                Nombre = dto.Nombre,
+                Tipo = dto.Tipo,
+                UsuarioId = userId
+            };
+
             var creada = await _service.CreateAsync(categoria);
             return CreatedAtAction(nameof(GetById), new { id = creada.Id }, creada);
         }
@@ -83,16 +112,25 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Update(string id, [FromBody] Categoria categoria)
+    public async Task<IActionResult> Update(string id, [FromBody] CategoriaUpdateDto dto)
     {
         try
         {
+            var userId = GetUserId();
+            
             // Ensure existence first so controller tests receive NotFound before validation errors
-            var existing = await _service.GetByIdAsync(id);
+            var existing = await _service.GetByIdAsync(id, userId);
             if (existing == null)
                 return NotFound(new { Message = "Not found" });
 
-            await _service.UpdateAsync(id, categoria);
+            var categoria = new Categoria
+            {
+                Nombre = dto.Nombre,
+                Tipo = dto.Tipo,
+                UsuarioId = userId
+            };
+
+            await _service.UpdateAsync(id, categoria, userId);
             return NoContent();
         }
         catch (KeyNotFoundException ex)
@@ -117,16 +155,25 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<Categoria>> UpdatePartial(string id, [FromBody] Categoria categoria)
+    public async Task<ActionResult<Categoria>> UpdatePartial(string id, [FromBody] CategoriaPartialUpdateDto dto)
     {
         try
         {
+            var userId = GetUserId();
+            
             // Ensure existence first so controller tests receive NotFound before validation errors
-            var existing = await _service.GetByIdAsync(id);
+            var existing = await _service.GetByIdAsync(id, userId);
             if (existing == null)
                 return NotFound(new { Message = "Not found" });
 
-            var actualizada = await _service.UpdatePartialAsync(id, categoria);
+            var partial = new Categoria
+            {
+                Nombre = dto.Nombre ?? string.Empty,
+                Tipo = dto.Tipo ?? string.Empty,
+                UsuarioId = userId
+            };
+
+            var actualizada = await _service.UpdatePartialAsync(id, partial, userId);
             return Ok(actualizada);
         }
         catch (KeyNotFoundException ex)
@@ -154,7 +201,8 @@ public class CategoriasController : ControllerBase
     {
         try
         {
-            await _service.DeleteAsync(id);
+            var userId = GetUserId();
+            await _service.DeleteAsync(id, userId);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

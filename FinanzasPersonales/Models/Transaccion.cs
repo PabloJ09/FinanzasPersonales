@@ -30,6 +30,6 @@ namespace FinanzasPersonales.Models
         public DateTime Fecha { get; set; } = DateTime.UtcNow;
 
         [Required(ErrorMessage = "UsuarioId es requerido.")]
-        public string UsuarioId { get; set; } = null!;
+        public string UsuarioId { get; set; } = null!; // Viene del JWT
     }
 }

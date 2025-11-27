@@ -1,9 +1,11 @@
 using FinanzasPersonales.Models;
+using FinanzasPersonales.Models.DTOs;
 using FinanzasPersonales.Services;
 using FinanzasPersonales.Common.Results;
 using FinanzasPersonales.Common.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace FinanzasPersonales.Controllers;
 
@@ -25,6 +27,22 @@ public class TransaccionesController : ControllerBase
     }
 
     /// <summary>
+    /// Extrae el userId del JWT
+    /// </summary>
+    private string GetUserId()
+    {
+        var userId =
+            User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+            User.FindFirst("usuarioId")?.Value ??
+            User.FindFirst("id")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+            throw new UnauthorizedAccessException("UserId not found in token");
+
+        return userId;
+    }
+
+    /// <summary>
     /// Obtiene todas las transacciones
     /// </summary>
     [HttpGet]
@@ -32,7 +50,8 @@ public class TransaccionesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<Transaccion>>> Get()
     {
-        var transacciones = await _service.GetAllAsync();
+        var userId = GetUserId();
+        var transacciones = await _service.GetAllAsync(userId);
         return Ok(transacciones);
     }
 
@@ -45,7 +64,8 @@ public class TransaccionesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<Transaccion>> GetById(string id)
     {
-        var transaccion = await _service.GetByIdAsync(id);
+        var userId = GetUserId();
+        var transaccion = await _service.GetByIdAsync(id, userId);
         if (transaccion == null)
             return NotFound(new { Message = "Not found" });
         return Ok(transaccion);
@@ -58,10 +78,22 @@ public class TransaccionesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<Transaccion>> Create([FromBody] Transaccion transaccion)
+    public async Task<ActionResult<Transaccion>> Create([FromBody] TransaccionCreateDto dto)
     {
         try
         {
+            var userId = GetUserId();
+
+            var transaccion = new Transaccion
+            {
+                Tipo = dto.Tipo,
+                Monto = dto.Monto,
+                Descripcion = dto.Descripcion,
+                CategoriaId = dto.CategoriaId,
+                Fecha = dto.Fecha,
+                UsuarioId = userId
+            };
+
             var creada = await _service.CreateAsync(transaccion);
             return CreatedAtAction(nameof(GetById), new { id = creada.Id }, creada);
         }
@@ -83,16 +115,28 @@ public class TransaccionesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Update(string id, [FromBody] Transaccion transaccion)
+    public async Task<IActionResult> Update(string id, [FromBody] TransaccionUpdateDto dto)
     {
         try
         {
+            var userId = GetUserId();
+            
             // Ensure existence first so controller tests receive NotFound before validation errors
-            var existing = await _service.GetByIdAsync(id);
+            var existing = await _service.GetByIdAsync(id, userId);
             if (existing == null)
                 return NotFound(new { Message = "Not found" });
 
-            await _service.UpdateAsync(id, transaccion);
+            var transaccion = new Transaccion
+            {
+                Tipo = dto.Tipo,
+                Monto = dto.Monto,
+                Descripcion = dto.Descripcion,
+                CategoriaId = dto.CategoriaId,
+                Fecha = dto.Fecha,
+                UsuarioId = userId
+            };
+
+            await _service.UpdateAsync(id, transaccion, userId);
             return NoContent();
         }
         catch (KeyNotFoundException ex)
@@ -120,7 +164,8 @@ public class TransaccionesController : ControllerBase
     {
         try
         {
-            await _service.DeleteAsync(id);
+            var userId = GetUserId();
+            await _service.DeleteAsync(id, userId);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

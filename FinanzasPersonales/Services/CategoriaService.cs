@@ -14,13 +14,13 @@ namespace FinanzasPersonales.Services;
 /// </summary>
 public interface ICategoriaService
 {
-    Task<List<Categoria>> GetAllAsync();
-    Task<Categoria?> GetByIdAsync(string id);
+    Task<List<Categoria>> GetAllAsync(string userId);
+    Task<Categoria?> GetByIdAsync(string id, string userId);
     Task<Categoria> CreateAsync(Categoria categoria);
-    Task<Categoria> UpdateAsync(string id, Categoria categoria);
-    Task<Categoria?> UpdatePartialAsync(string id, Categoria partial);
+    Task<Categoria> UpdateAsync(string id, Categoria categoria, string userId);
+    Task<Categoria?> UpdatePartialAsync(string id, Categoria partial, string userId);
     Task<List<Categoria>> GetByUsuarioIdAsync(string usuarioId);
-    Task DeleteAsync(string id);
+    Task DeleteAsync(string id, string userId);
 }
 
 public class CategoriaService : ICategoriaService
@@ -40,22 +40,28 @@ public class CategoriaService : ICategoriaService
     {
     }
 
-    public async Task<List<Categoria>> GetAllAsync()
+    public async Task<List<Categoria>> GetAllAsync(string userId)
     {
-        return await _repository.GetAllAsync();
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
+
+        return await _repository.FindAsync(c => c.UsuarioId == userId);
     }
 
     // Backwards-compatible method name
-    public Task<List<Categoria>> GetAsync() => GetAllAsync();
+    public Task<List<Categoria>> GetAsync() => GetAllAsync(string.Empty);
 
-    public async Task<Categoria?> GetByIdAsync(string id)
+    public async Task<Categoria?> GetByIdAsync(string id, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
 
         // Return null when not found to preserve previous behavior expected by tests
-        var categoria = await _repository.GetByIdAsync(id);
-        return categoria;
+        var categorias = await _repository.FindAsync(c => c.Id == id && c.UsuarioId == userId);
+        return categorias.FirstOrDefault();
     }
 
     public async Task<Categoria> CreateAsync(Categoria categoria)
@@ -75,13 +81,16 @@ public class CategoriaService : ICategoriaService
         return await _repository.AddAsync(categoria);
     }
 
-    public async Task<Categoria> UpdateAsync(string id, Categoria categoria)
+    public async Task<Categoria> UpdateAsync(string id, Categoria categoria, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
 
         if (categoria == null)
             throw new ArgumentNullException(nameof(categoria));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
 
         // Validate incoming model first (tests expect validation to occur before repository access)
         var validationResult = await _validator.ValidateAsync(categoria);
@@ -91,20 +100,30 @@ public class CategoriaService : ICategoriaService
             throw new System.ComponentModel.DataAnnotations.ValidationException(message);
         }
 
+        // Verify that the category belongs to the user
+        var existing = await _repository.FindAsync(c => c.Id == id && c.UsuarioId == userId);
+        if (!existing.Any())
+            throw new KeyNotFoundException($"La entidad '{nameof(Categoria)}' con id '{id}' no fue encontrada o no pertenece al usuario.");
+
         categoria.Id = id;
-        // Delegate update to repository which will throw KeyNotFoundException if not found
+        categoria.UsuarioId = userId; // Ensure userId is not changed
         return await _repository.UpdateAsync(categoria);
     }
 
-    public async Task<Categoria?> UpdatePartialAsync(string id, Categoria partial)
+    public async Task<Categoria?> UpdatePartialAsync(string id, Categoria partial, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
 
         if (partial == null)
             throw new ArgumentNullException(nameof(partial));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
 
-        var existing = await _repository.GetByIdAsync(id);
+        // Verify that the category belongs to the user
+        var existingList = await _repository.FindAsync(c => c.Id == id && c.UsuarioId == userId);
+        var existing = existingList.FirstOrDefault();
         if (existing == null)
             // Tests expect null when an entity is not found for partial update
             return null!;
@@ -116,8 +135,8 @@ public class CategoriaService : ICategoriaService
         if (!string.IsNullOrEmpty(partial.Tipo))
             existing.Tipo = partial.Tipo;
 
-        if (!string.IsNullOrEmpty(partial.UsuarioId))
-            existing.UsuarioId = partial.UsuarioId;
+        // UsuarioId should NOT be updated for security
+        // Keep the existing userId
 
         // Validar el objeto actualizado
         var validationResult = await _validator.ValidateAsync(existing);
@@ -138,10 +157,18 @@ public class CategoriaService : ICategoriaService
         return await _repository.FindAsync(c => c.UsuarioId == usuarioId);
     }
 
-    public async Task DeleteAsync(string id)
+    public async Task DeleteAsync(string id, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
+
+        // Verify that the category belongs to the user
+        var existing = await _repository.FindAsync(c => c.Id == id && c.UsuarioId == userId);
+        if (!existing.Any())
+            throw new KeyNotFoundException($"La entidad '{nameof(Categoria)}' con id '{id}' no fue encontrada o no pertenece al usuario.");
 
         var deleted = await _repository.DeleteAsync(id);
         if (!deleted)

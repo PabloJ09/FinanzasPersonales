@@ -13,12 +13,13 @@ namespace FinanzasPersonales.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly UsuarioService _usuarioService;
+    private readonly IUsuarioService _usuarioService;
 
-    public AuthController(UsuarioService usuarioService)
+    public AuthController(IUsuarioService usuarioService)
     {
         _usuarioService = usuarioService;
     }
+
 
     public class RegisterRequest
     {

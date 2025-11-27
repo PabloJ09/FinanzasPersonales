@@ -14,13 +14,13 @@ namespace FinanzasPersonales.Services;
 /// </summary>
 public interface ITransaccionService
 {
-    Task<List<Transaccion>> GetAllAsync();
-    Task<Transaccion?> GetByIdAsync(string id);
+    Task<List<Transaccion>> GetAllAsync(string userId);
+    Task<Transaccion?> GetByIdAsync(string id, string userId);
     Task<Transaccion> CreateAsync(Transaccion transaccion);
-    Task<Transaccion> UpdateAsync(string id, Transaccion transaccion);
+    Task<Transaccion> UpdateAsync(string id, Transaccion transaccion, string userId);
     Task<List<Transaccion>> GetByUsuarioIdAsync(string usuarioId);
     Task<List<Transaccion>> GetByCategoriaAsync(string categoriaId);
-    Task DeleteAsync(string id);
+    Task DeleteAsync(string id, string userId);
 }
 
 public class TransaccionService : ITransaccionService
@@ -41,21 +41,27 @@ public class TransaccionService : ITransaccionService
     }
 
     // Backwards-compatible method name
-    public Task<List<Transaccion>> GetAsync() => GetAllAsync();
+    public Task<List<Transaccion>> GetAsync() => GetAllAsync(string.Empty);
 
-    public async Task<List<Transaccion>> GetAllAsync()
+    public async Task<List<Transaccion>> GetAllAsync(string userId)
     {
-        return await _repository.GetAllAsync();
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
+
+        return await _repository.FindAsync(t => t.UsuarioId == userId);
     }
 
-    public async Task<Transaccion?> GetByIdAsync(string id)
+    public async Task<Transaccion?> GetByIdAsync(string id, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
 
         // Return null when not found to preserve test expectations
-        var transaccion = await _repository.GetByIdAsync(id);
-        return transaccion;
+        var transacciones = await _repository.FindAsync(t => t.Id == id && t.UsuarioId == userId);
+        return transacciones.FirstOrDefault();
     }
 
     public async Task<Transaccion> CreateAsync(Transaccion transaccion)
@@ -75,13 +81,16 @@ public class TransaccionService : ITransaccionService
         return await _repository.AddAsync(transaccion);
     }
 
-    public async Task<Transaccion> UpdateAsync(string id, Transaccion transaccion)
+    public async Task<Transaccion> UpdateAsync(string id, Transaccion transaccion, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
 
         if (transaccion == null)
             throw new ArgumentNullException(nameof(transaccion));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
 
         // Validate incoming model first (tests expect validation to occur before repository access)
         var validationResult = await _validator.ValidateAsync(transaccion);
@@ -91,8 +100,13 @@ public class TransaccionService : ITransaccionService
             throw new System.ComponentModel.DataAnnotations.ValidationException(message);
         }
 
+        // Verify that the transaction belongs to the user
+        var existing = await _repository.FindAsync(t => t.Id == id && t.UsuarioId == userId);
+        if (!existing.Any())
+            throw new KeyNotFoundException($"La entidad '{nameof(Transaccion)}' con id '{id}' no fue encontrada o no pertenece al usuario.");
+
         transaccion.Id = id;
-        // Delegate update to repository which will throw KeyNotFoundException if not found
+        transaccion.UsuarioId = userId; // Ensure userId is not changed
         return await _repository.UpdateAsync(transaccion);
     }
 
@@ -112,10 +126,18 @@ public class TransaccionService : ITransaccionService
         return await _repository.FindAsync(t => t.CategoriaId == categoriaId);
     }
 
-    public async Task DeleteAsync(string id)
+    public async Task DeleteAsync(string id, string userId)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException(nameof(id));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentNullException(nameof(userId));
+
+        // Verify that the transaction belongs to the user
+        var existing = await _repository.FindAsync(t => t.Id == id && t.UsuarioId == userId);
+        if (!existing.Any())
+            throw new KeyNotFoundException($"La entidad '{nameof(Transaccion)}' con id '{id}' no fue encontrada o no pertenece al usuario.");
 
         var deleted = await _repository.DeleteAsync(id);
         if (!deleted)

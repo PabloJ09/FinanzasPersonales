@@ -147,7 +147,8 @@ public class UsuarioService : IUsuarioService
 
         var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id ?? string.Empty),
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id ?? string.Empty), // ID REAL DEL USUARIO
+            new Claim("usuarioId", user.Id ?? string.Empty),
             new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
             new Claim(ClaimTypes.Role, user.Role ?? "usuario")
         };
@@ -156,7 +157,7 @@ public class UsuarioService : IUsuarioService
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(8),
+            expires: DateTime.UtcNow.AddHours(4),
             signingCredentials: credentials
         );
 

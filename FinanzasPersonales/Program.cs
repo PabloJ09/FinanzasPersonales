@@ -27,6 +27,16 @@ var builder = WebApplication.CreateBuilder(args);
 // CONFIGURACIÓN DE SERVICIOS
 // ============================
 
+// CORS para permitir UI local (Vite)
+const string CorsPolicy = "AllowUI";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: CorsPolicy, policy =>
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
+
 // 🔹 Crear objeto MongoDBSettings a partir de las variables de entorno
 var mongoSettings = new MongoDBSettings
 {
@@ -189,6 +199,9 @@ app.UseHttpsRedirection();
 
 // 🔹 Middleware de manejo centralizado de excepciones (Principio: Single Responsibility)
 //app.UseGlobalExceptionHandler();
+
+// CORS antes de auth
+app.UseCors(CorsPolicy);
 
 // Autenticación y autorización
 app.UseAuthentication();

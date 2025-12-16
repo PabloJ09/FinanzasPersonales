@@ -89,6 +89,16 @@ builder.Services.AddScoped<ICategoriaService, CategoriaService>();
 builder.Services.AddScoped<ITransaccionService, TransaccionService>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 
+// 🔹 Registrar HttpClient para servicios externos
+builder.Services.AddHttpClient("Anthropic", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+// 🔹 Registrar Servicios de IA
+builder.Services.AddScoped<FinanzasPersonales.Services.IA.IAnthropicService, FinanzasPersonales.Services.IA.AnthropicService>();
+builder.Services.AddScoped<FinanzasPersonales.Services.IA.IProcesamientoIAService, FinanzasPersonales.Services.IA.ProcesamientoIAService>();
+
 
 // 🔹 Registrar Controladores REST
 builder.Services.AddControllers();

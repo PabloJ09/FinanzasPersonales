@@ -8,7 +8,6 @@ export default function CategoriasPage() {
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<'Ingreso' | 'Gasto'>('Ingreso');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   const { data: categorias, isLoading } = useQuery<Categoria[]>({
@@ -60,7 +59,6 @@ export default function CategoriasPage() {
     mutationFn: (id: string) => categoriasApi.remove(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categorias'] });
-      setDeleteConfirm(null);
       setErrorMsg('');
     },
     onError: (error: any) => {
@@ -71,7 +69,6 @@ export default function CategoriasPage() {
       } else {
         setErrorMsg('Error al eliminar la categoría. Intenta de nuevo.');
       }
-      setDeleteConfirm(null);
     },
   });
 
@@ -104,11 +101,9 @@ export default function CategoriasPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (deleteConfirm === id) {
+    const confirm = window.confirm('¿Eliminar esta categoría? Esta acción no se puede deshacer.');
+    if (confirm) {
       deleteMutation.mutate(id);
-    } else {
-      setDeleteConfirm(id);
-      setTimeout(() => setDeleteConfirm(null), 3000);
     }
   };
 
@@ -126,6 +121,10 @@ export default function CategoriasPage() {
         <h1 className="heading-page">Categorías</h1>
       </div>
 
+      <p className="text-sm text-slate-400">
+        Tip: haz clic en el lápiz para editar (los datos suben al formulario) y en el basurero para eliminar (se pedirá confirmación).
+      </p>
+
       {/* Error Message */}
       {errorMsg && (
         <div className="alert-error">
@@ -139,6 +138,9 @@ export default function CategoriasPage() {
           <h2 className="heading-section">
             {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
           </h2>
+          {editingId && (
+            <p className="text-xs text-amber-300 mt-2">Estás editando una categoría existente. El formulario ya está cargado.</p>
+          )}
         </CardHeader>
         <CardBody>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -225,8 +227,7 @@ export default function CategoriasPage() {
                     </IconButton>
                     <IconButton
                       onClick={() => handleDelete(cat.id)}
-                      className={deleteConfirm === cat.id ? 'text-red-400 bg-red-500/20' : ''}
-                      title={deleteConfirm === cat.id ? 'Confirmar eliminación' : 'Eliminar'}
+                      title="Eliminar"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
